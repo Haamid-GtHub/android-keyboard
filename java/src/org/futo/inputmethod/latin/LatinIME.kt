@@ -215,6 +215,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     // Apply title case to the complete editor text only after a typing pause.
     private val haamidFormatHandler = Handler(Looper.getMainLooper())
     private val haamidFormatRunnable = Runnable { formatEditorTextAfterPause() }
+    @Volatile private var haamidFormattingInProgress = false
 
     val colorScheme get() = activeColorScheme.value
     val keyboardColor get() = colorScheme.keyboardSurface.let { fallback ->
@@ -390,6 +391,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
 
     override fun onCreate() {
         super.onCreate()
+        HaamidFormattingSettings.initialize(this)
 
         UserBinaryDictionary.resetUserDictionariesRequiringRecreation()
 
@@ -673,6 +675,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
 
     private fun scheduleHaamidFormatting(newSelStart: Int, newSelEnd: Int) {
         haamidFormatHandler.removeCallbacks(haamidFormatRunnable)
+        if (haamidFormattingInProgress) return
         if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) return
         if (newSelStart < 0 || newSelStart != newSelEnd) return
 
@@ -708,12 +711,15 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         val formatted = HaamidFormatter.format(original)
         if (formatted == original || currentInputConnection !== connection) return
 
+        haamidFormattingInProgress = true
+        haamidFormatHandler.removeCallbacks(haamidFormatRunnable)
         connection.beginBatchEdit()
         try {
             connection.setSelection(0, original.length)
             connection.commitText(formatted, 1)
         } finally {
             connection.endBatchEdit()
+            haamidFormattingInProgress = false
         }
     }
     override fun onUpdateSelection(
