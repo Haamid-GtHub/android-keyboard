@@ -39,3 +39,24 @@ val PasteAction = Action(
     },
     windowImpl = null,
 )
+
+/**
+ * Applies Haamid's strict title-case formatter to the text selected in the active editor.
+ * This action intentionally uses the active InputConnection so it works with the user's
+ * selection without changing FUTO's voice-input implementation.
+ */
+val HaamidFormatterAction = Action(
+    icon = R.drawable.edit_text,
+    name = R.string.action_haamid_formatter_title,
+    simplePressImpl = { manager, _ ->
+        val connection = manager.getLatinIMEForDebug().currentInputConnection
+        val selected = connection?.getSelectedText(0)
+        if (selected.isNullOrEmpty()) {
+            manager.announce(manager.getContext().getString(R.string.action_haamid_formatter_select_text))
+        } else {
+            connection.commitText(org.futo.inputmethod.latin.HaamidFormatter.format(selected.toString()), 1)
+            manager.announce(manager.getContext().getString(R.string.action_haamid_formatter_done))
+        }
+    },
+    windowImpl = null,
+)
