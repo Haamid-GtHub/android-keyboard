@@ -759,13 +759,17 @@ public class LatinIMELegacy implements KeyboardActionListener,
     // Called from PointerTracker through the KeyboardActionListener interface
     @Override
     public void onTextInput(final String rawText) {
-        final Event event = Event.createSoftwareTextEvent(rawText, Constants.CODE_OUTPUT_TEXT);
+        // Shared text-entry boundary: format keyboard text and voice-produced text before
+        // forwarding it to the active input engine. The voice engine itself is unchanged.
+        final String formattedText = HaamidFormatter.format(rawText);
+        final Event event = Event.createSoftwareTextEvent(formattedText, Constants.CODE_OUTPUT_TEXT);
         getActiveIME().onEvent(event);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState());
     }
 
     public void onTextInputWithSpace(final String rawText) {
-        final Event event = Event.createSoftwareTextEvent(rawText, Constants.CODE_OUTPUT_TEXT_WITH_SPACES);
+        final String formattedText = HaamidFormatter.format(rawText);
+        final Event event = Event.createSoftwareTextEvent(formattedText, Constants.CODE_OUTPUT_TEXT_WITH_SPACES);
         getActiveIME().onEvent(event);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState());
     }
