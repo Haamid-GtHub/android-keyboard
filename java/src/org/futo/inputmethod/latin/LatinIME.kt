@@ -144,6 +144,7 @@ open class InputMethodServiceCompose : InputMethodService(), LifecycleOwner, Vie
 
     override fun onCreate() {
         super.onCreate()
+        HaamidFormattingSettings.initialize(this)
 
         mLifecycleRegistry = LifecycleRegistry(this)
         mLifecycleRegistry.currentState = Lifecycle.State.INITIALIZED
