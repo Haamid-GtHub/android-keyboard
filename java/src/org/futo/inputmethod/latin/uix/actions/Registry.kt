@@ -44,6 +44,7 @@ val AllActionsMap = mapOf(
     "right" to ArrowRightAction,
     "font_typer" to FontTyperAction,
     "haamid_formatter" to HaamidFormatterAction,
+    "haamid_auto_format_toggle" to HaamidAutoFormatToggleAction,
 )
 
 val ActionToId = AllActionsMap.entries.associate { it.value to it.key }
