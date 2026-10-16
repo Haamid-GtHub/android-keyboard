@@ -83,7 +83,7 @@ val HaamidAutoFormatToggleAction = Action(
     icon = R.drawable.edit_text,
     name = R.string.action_haamid_auto_format_toggle,
     simplePressImpl = { manager, _ ->
-        val enabled = org.futo.inputmethod.latin.HaamidFormattingSettings.toggleAutomaticFormatting()
+        val enabled = org.futo.inputmethod.latin.HaamidFormattingSettings.toggleAutomaticFormatting(manager.getContext())
         val message = if (enabled) R.string.action_haamid_auto_format_enabled else R.string.action_haamid_auto_format_disabled
         manager.announce(manager.getContext().getString(message))
     },
