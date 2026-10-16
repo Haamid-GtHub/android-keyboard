@@ -377,7 +377,7 @@ public final class InputLogic {
             resetComposingState(true /* alsoResetLastComposedWord */);
         }
         postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
-        final String text = performSpecificTldProcessingOnTextInput(HaamidFormatter.format(rawText));
+        final String text = performSpecificTldProcessingOnTextInput(HaamidFormattingSettings.isAutomaticFormattingEnabled() ? HaamidFormatter.format(rawText) : rawText);
         if (SpaceState.PHANTOM == mSpaceState) {
             insertAutomaticSpaceIfOptionsAndTextAllow(settingsValues);
         }
@@ -2772,7 +2772,7 @@ public final class InputLogic {
         final SuggestedWords suggestedWords = mSuggestedWords;
         // TODO: Locale should be determined based on context and the text given.
         final Locale locale = getDictionaryFacilitatorLocale();
-        final CharSequence chosenWordWithSuggestions = HaamidFormatter.format(chosenWord);
+        final CharSequence chosenWordWithSuggestions = HaamidFormattingSettings.isAutomaticFormattingEnabled() ? HaamidFormatter.format(chosenWord) : chosenWord;
         // b/21926256
         //      SuggestionSpanUtils.getTextWithSuggestionSpan(mLatinIME, chosenWord,
         //                suggestedWords, locale);
