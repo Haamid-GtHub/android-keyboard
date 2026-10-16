@@ -51,7 +51,7 @@ val HaamidFormatterAction = Action(
     simplePressImpl = { manager, _ ->
         val connection = manager.getLatinIMEForDebug().currentInputConnection
         val selected = connection?.getSelectedText(0)
-        if (selected.isNullOrEmpty()) {
+        if (connection == null || selected.isNullOrEmpty()) {
             manager.announce(manager.getContext().getString(R.string.action_haamid_formatter_select_text))
         } else {
             connection.commitText(org.futo.inputmethod.latin.HaamidFormatter.format(selected.toString()), 1)
