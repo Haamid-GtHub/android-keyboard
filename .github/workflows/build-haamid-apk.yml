@@ -1,0 +1,39 @@
+name: Build Haamid Keyboard APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - haamid-strict-title-case
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repository And Submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set Up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Unstable Debug APK
+        run: ./gradlew assembleUnstableDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: haamid-keyboard-unstable-debug-apk
+          path: '**/build/outputs/apk/**/*.apk'
+          if-no-files-found: error
+          retention-days: 14
