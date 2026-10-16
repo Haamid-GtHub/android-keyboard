@@ -1,0 +1,75 @@
+name: Sync FUTO Updates And Build Haamid Keyboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Check upstream once every day.
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: haamid-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Haamid Branch And Submodules
+        uses: actions/checkout@v4
+        with:
+          ref: haamid-strict-title-case
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch FUTO Upstream
+        run: |
+          git remote add upstream https://github.com/futo-org/android-keyboard.git
+          git fetch upstream master
+
+      - name: Merge Upstream Without Overwriting Haamid Changes
+        run: |
+          set +e
+          git merge --no-edit upstream/master
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            git merge --abort || true
+            echo "::error::FUTO's update conflicts with custom Haamid changes. No merge was pushed. The conflict must be resolved before this update can be built."
+            exit 1
+          fi
+
+      - name: Push Updated Branch
+        run: git push origin HEAD:haamid-strict-title-case
+
+      - name: Set Up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Unstable Debug APK
+        env:
+          VERSION_CODE: 1
+          VERSION_NAME: 0.0.0
+          BRANCH_NAME: haamid-strict-title-case
+        run: ./gradlew assembleUnstableDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: haamid-keyboard-unstable-debug-apk
+          path: '**/build/outputs/apk/**/*.apk'
+          if-no-files-found: error
+          retention-days: 14
