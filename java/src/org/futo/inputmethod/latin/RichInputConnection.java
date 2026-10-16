@@ -353,12 +353,8 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         mComposingText.setLength(0);
         if (isConnected()) {
             mTempObjectForCommitText.clear();
-            // Apply Haamid's formatter to committed multi-character text. Single-character
-            // commits are left untouched so normal composing/typing is not rewritten per key.
-            final CharSequence textToCommit = text.length() > 1
-                    ? org.futo.inputmethod.latin.HaamidFormatter.format(text.toString())
-                    : text;
-            mTempObjectForCommitText.append(textToCommit);
+            // Keep the connection transparent: source-specific formatting is handled by the keyboard, not every commit.
+            mTempObjectForCommitText.append(text);
             final CharacterStyle[] spans = mTempObjectForCommitText.getSpans(
                     0, text.length(), CharacterStyle.class);
             for (final CharacterStyle span : spans) {
