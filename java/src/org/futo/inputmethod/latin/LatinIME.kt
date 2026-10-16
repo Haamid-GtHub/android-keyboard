@@ -9,12 +9,15 @@ import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.CompletionInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputConnection
@@ -207,6 +210,10 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     private var activeThemeOption: ThemeOption? = null
     private val activeColorScheme = mutableStateOf(DefaultDarkScheme.obtainColors(this))
     private var pendingRecreateKeyboard: Boolean = false
+
+    // Apply title case to the complete editor text only after a typing pause.
+    private val haamidFormatHandler = Handler(Looper.getMainLooper())
+    private val haamidFormatRunnable = Runnable { formatEditorTextAfterPause() }
 
     val colorScheme get() = activeColorScheme.value
     val keyboardColor get() = colorScheme.keyboardSurface.let { fallback ->
@@ -663,6 +670,51 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         uixManager.onInputFinishing()
     }
 
+    private fun scheduleHaamidFormatting(newSelStart: Int, newSelEnd: Int) {
+        haamidFormatHandler.removeCallbacks(haamidFormatRunnable)
+        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) return
+        if (newSelStart < 0 || newSelStart != newSelEnd) return
+
+        val editorInfo = currentInputEditorInfo ?: return
+        val inputType = editorInfo.inputType
+        val inputClass = inputType and android.text.InputType.TYPE_MASK_CLASS
+        val variation = inputType and android.text.InputType.TYPE_MASK_VARIATION
+        // Never rewrite password fields or non-text editors.
+        if (inputClass != android.text.InputType.TYPE_CLASS_TEXT) return
+        if (variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) return
+
+        haamidFormatHandler.postDelayed(haamidFormatRunnable, 1200L)
+    }
+
+    private fun formatEditorTextAfterPause() {
+        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) return
+        val connection = currentInputConnection ?: return
+        val editorInfo = currentInputEditorInfo ?: return
+        if ((editorInfo.inputType and android.text.InputType.TYPE_MASK_CLASS) !=
+            android.text.InputType.TYPE_CLASS_TEXT) return
+
+        val extracted = connection.getExtractedText(ExtractedTextRequest(), 0) ?: return
+        val original = extracted.text?.toString() ?: return
+        // Only handle a complete field snapshot. Do not accidentally replace a partial window.
+        if (extracted.startOffset != 0 || extracted.partialStartOffset != -1 ||
+            extracted.partialEndOffset != -1) return
+        // Keep cursor and selection safe: format only when the caret is at the end.
+        if (extracted.selectionStart != original.length ||
+            extracted.selectionEnd != original.length) return
+
+        val formatted = HaamidFormatter.format(original)
+        if (formatted == original || currentInputConnection !== connection) return
+
+        connection.beginBatchEdit()
+        try {
+            connection.setSelection(0, original.length)
+            connection.commitText(formatted, 1)
+        } finally {
+            connection.endBatchEdit()
+        }
+    }
     override fun onUpdateSelection(
         oldSelStart: Int,
         oldSelEnd: Int,
@@ -688,6 +740,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             candidatesStart,
             candidatesEnd
         )
+        scheduleHaamidFormatting(newSelStart, newSelEnd)
     }
 
     override fun onExtractedTextClicked() {
