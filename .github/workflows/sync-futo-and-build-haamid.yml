@@ -61,15 +61,28 @@ jobs:
 
       - name: Build Unstable Debug APK
         env:
-          VERSION_CODE: 1
-          VERSION_NAME: 0.0.0
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 0.0.${{ github.run_number }}
           BRANCH_NAME: haamid-strict-title-case
         run: ./gradlew assembleUnstableDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: haamid-keyboard-unstable-debug-apk
           path: '**/build/outputs/apk/**/*.apk'
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish APK Release For Easy Download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Built APK could not be found."
+            exit 1
+          fi
+          TAG="haamid-build-$VERSION_CODE"
+          gh release create "$TAG" "$APK"             --title "Haamid Keyboard Build $VERSION_CODE"             --notes "Automated build of the Haamid title-case keyboard from the custom branch after syncing FUTO upstream. This is a test build; confirm formatting on-device before relying on it."
