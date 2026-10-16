@@ -9,6 +9,9 @@
     <string name="action_undo_title">Undo</string>
     <string name="action_redo_title">Redo</string>
     <string name="action_text_editor_title">Text Editor</string>
+    <string name="action_haamid_formatter_title">Title Case</string>
+    <string name="action_haamid_formatter_select_text">Select text first, then tap Title Case</string>
+    <string name="action_haamid_formatter_done">Title Case applied</string>
     <string name="action_debug_title">Debug Info</string>
     <string name="action_more_actions_title">All Actions</string>
     <string name="action_bug_viewer_title">Bug Viewer</string>
