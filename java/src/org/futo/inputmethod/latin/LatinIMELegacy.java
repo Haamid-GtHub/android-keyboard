@@ -761,9 +761,7 @@ public class LatinIMELegacy implements KeyboardActionListener,
     public void onTextInput(final String rawText) {
         // Do not title-case individual key/text events: that breaks acronyms and numeric tokens.
         // Whole-field automatic formatting is debounced in LatinIME after the user pauses.
-        final String text = HaamidFormattingSettings.isAutomaticFormattingEnabled()
-                ? rawText : rawText;
-        final Event event = Event.createSoftwareTextEvent(text, Constants.CODE_OUTPUT_TEXT);
+        final Event event = Event.createSoftwareTextEvent(rawText, Constants.CODE_OUTPUT_TEXT);
         getActiveIME().onEvent(event);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState());
     }
