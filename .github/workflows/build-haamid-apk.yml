@@ -7,7 +7,7 @@ on:
       - haamid-strict-title-case
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -35,10 +35,26 @@ jobs:
           BRANCH_NAME: haamid-strict-title-case
         run: ./gradlew assembleUnstableDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: haamid-keyboard-unstable-debug-apk
           path: '**/build/outputs/apk/**/*.apk'
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish Installable APK Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Built APK could not be found."
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+          TAG="haamid-test-$VERSION_CODE"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Test $VERSION_CODE" \
+            --notes "Installable test build with Haamid's title-case formatter and manual Title Case action. Test on your device before relying on it. This release provides downloads; it does not silently update an already installed app."
