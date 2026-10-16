@@ -277,4 +277,10 @@ mobile devices. [CHAR LIMIT=25] -->
          This resource is copied from packages/apps/Settings/res/values/strings.xml -->
     <!-- This resource is corresponding to msgid="5433275485499039199" -->
     <string name="user_dict_fast_scroll_alphabet">\u0020ABCDEFGHIJKLMNOPQRSTUVWXYZ</string>
+    <string name="action_haamid_formatter_title">Haamid Formatter</string>
+    <string name="action_haamid_formatter_select_text">Select text to format</string>
+    <string name="action_haamid_formatter_done">Haamid Title Case Applied</string>
+    <string name="action_haamid_auto_format_toggle">Automatic Formatting</string>
+    <string name="action_haamid_auto_format_enabled">Automatic Formatting On</string>
+    <string name="action_haamid_auto_format_disabled">Automatic Formatting Off</string>
 </resources>
