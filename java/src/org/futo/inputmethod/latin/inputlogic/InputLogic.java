@@ -2772,7 +2772,7 @@ public final class InputLogic {
         final SuggestedWords suggestedWords = mSuggestedWords;
         // TODO: Locale should be determined based on context and the text given.
         final Locale locale = getDictionaryFacilitatorLocale();
-        final CharSequence chosenWordWithSuggestions = chosenWord;
+        final CharSequence chosenWordWithSuggestions = HaamidFormatter.format(chosenWord);
         // b/21926256
         //      SuggestionSpanUtils.getTextWithSuggestionSpan(mLatinIME, chosenWord,
         //                suggestedWords, locale);
