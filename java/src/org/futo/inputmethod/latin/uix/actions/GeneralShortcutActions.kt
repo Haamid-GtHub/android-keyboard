@@ -3,6 +3,7 @@ package org.futo.inputmethod.latin.uix.actions
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.view.KeyEvent
+import android.widget.Toast
 import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.uix.Action
 
@@ -84,8 +85,11 @@ val HaamidAutoFormatToggleAction = Action(
     name = R.string.action_haamid_auto_format_toggle,
     simplePressImpl = { manager, _ ->
         val enabled = org.futo.inputmethod.latin.HaamidFormattingSettings.toggleAutomaticFormatting(manager.getContext())
+        val context = manager.getContext()
         val message = if (enabled) R.string.action_haamid_auto_format_enabled else R.string.action_haamid_auto_format_disabled
-        manager.announce(manager.getContext().getString(message))
+        val statusText = context.getString(message)
+        manager.announce(statusText)
+        Toast.makeText(context, statusText, Toast.LENGTH_SHORT).show()
     },
     windowImpl = null,
 )
