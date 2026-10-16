@@ -30,8 +30,8 @@ jobs:
 
       - name: Build Unstable Debug APK
         env:
-          VERSION_CODE: 1
-          VERSION_NAME: 0.0.0
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 0.0.${{ github.run_number }}
           BRANCH_NAME: haamid-strict-title-case
         run: ./gradlew assembleUnstableDebug --stacktrace
 
