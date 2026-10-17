@@ -59,24 +59,41 @@ val HaamidFormatterAction = Action(
         if (connection == null) {
             manager.announce(context.getString(R.string.action_haamid_formatter_select_text))
         } else {
-            val extracted = connection.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
-            val original = extracted?.text?.toString()
-            // Refuse partial editor snapshots: replacing one would risk deleting unseen text.
-            if (original.isNullOrEmpty() || extracted.startOffset != 0 ||
-                extracted.partialStartOffset != -1 || extracted.partialEndOffset != -1) {
-                manager.announce(context.getString(R.string.action_haamid_formatter_select_text))
-            } else {
-                val formatted = org.futo.inputmethod.latin.HaamidFormatter.format(original)
-                if (formatted != original) {
+            val selected = connection.getSelectedText(0)?.toString()
+            if (!selected.isNullOrEmpty()) {
+                // If text is selected, change only that selection.
+                val formatted = org.futo.inputmethod.latin.HaamidFormatter.format(selected)
+                if (formatted != selected) {
                     connection.beginBatchEdit()
                     try {
-                        connection.setSelection(0, original.length)
                         connection.commitText(formatted, 1)
                     } finally {
                         connection.endBatchEdit()
                     }
                 }
                 manager.announce(context.getString(R.string.action_haamid_formatter_done))
+            } else {
+                // With no selection, format the whole editor only if Android provides a complete snapshot.
+                val extracted = connection.getExtractedText(
+                    android.view.inputmethod.ExtractedTextRequest(), 0
+                )
+                val original = extracted?.text?.toString()
+                if (original.isNullOrEmpty() || extracted.startOffset != 0 ||
+                    extracted.partialStartOffset != -1 || extracted.partialEndOffset != -1) {
+                    manager.announce(context.getString(R.string.action_haamid_formatter_select_text))
+                } else {
+                    val formatted = org.futo.inputmethod.latin.HaamidFormatter.format(original)
+                    if (formatted != original) {
+                        connection.beginBatchEdit()
+                        try {
+                            connection.setSelection(0, original.length)
+                            connection.commitText(formatted, 1)
+                        } finally {
+                            connection.endBatchEdit()
+                        }
+                    }
+                    manager.announce(context.getString(R.string.action_haamid_formatter_done))
+                }
             }
         }
     },
