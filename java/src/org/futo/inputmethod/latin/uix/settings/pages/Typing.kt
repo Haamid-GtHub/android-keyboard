@@ -795,7 +795,6 @@ val KeyboardSettingsMenu = UserSettingsMenu(
     title = R.string.keyboard_settings_title,
     navPath = "keyboard", registerNavPath = true,
     settings = listOf(
-    settings = listOf(
         UserSetting(
             name = R.string.haamid_auto_title_case,
             component = {
