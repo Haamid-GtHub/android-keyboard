@@ -671,43 +671,6 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         uixManager.onInputFinishing()
     }
 
-    /**
-     * Formats the whole editor once, immediately before a supported completion action.
-     * This deliberately is not called from selection/cursor callbacks, so typing does not
-     * trigger repeated whole-field rewrites.
-     */
-    fun formatHaamidTextBeforeCompletion() {
-        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) return
-        val connection = currentInputConnection ?: return
-        val editorInfo = currentInputEditorInfo ?: return
-        val inputType = editorInfo.inputType
-        val inputClass = inputType and android.text.InputType.TYPE_MASK_CLASS
-        val variation = inputType and android.text.InputType.TYPE_MASK_VARIATION
-        if (inputClass != android.text.InputType.TYPE_CLASS_TEXT) return
-        if (variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-            variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
-            variation == android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
-            variation == android.text.InputType.TYPE_TEXT_VARIATION_URI) return
-
-        val extracted = connection.getExtractedText(ExtractedTextRequest(), 0) ?: return
-        val original = extracted.text?.toString() ?: return
-        if (extracted.startOffset != 0 || extracted.partialStartOffset != -1 ||
-            extracted.partialEndOffset != -1) return
-        val formatted = HaamidFormatter.format(original)
-        if (formatted == original || currentInputConnection !== connection) return
-
-        connection.beginBatchEdit()
-        try {
-            // One replacement at completion only; never triggered by selection updates.
-            connection.setSelection(0, original.length)
-            connection.commitText(formatted, 1)
-        } finally {
-            connection.endBatchEdit()
-        }
-    }
-
     override fun onUpdateSelection(
         oldSelStart: Int,
         oldSelEnd: Int,
@@ -835,14 +798,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // Hardware Enter is a completion opportunity when the editor uses a send/done action.
-        if (keyCode == KeyEvent.KEYCODE_ENTER) {
-            val action = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)
-            if (action == EditorInfo.IME_ACTION_SEND || action == EditorInfo.IME_ACTION_DONE ||
-                action == EditorInfo.IME_ACTION_GO) {
-                formatHaamidTextBeforeCompletion()
-            }
-        }
+        // Enter is always passed through unchanged; Title Case is an explicit toolbar action.
         return latinIMELegacy.onKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
     }
 
