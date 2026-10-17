@@ -647,6 +647,9 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     }
 
     override fun onFinishInput() {
+        // A real editor-focus/input finish is a safe completion signal: format once here,
+        // without a timer or selection callbacks while the user is still typing.
+        formatHaamidTextBeforeCompletion()
         super.onFinishInput()
         latinIMELegacy.onFinishInput()
         uixManager.onInputFinishing()
