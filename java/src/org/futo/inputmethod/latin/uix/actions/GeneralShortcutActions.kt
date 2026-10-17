@@ -38,21 +38,9 @@ val PasteAction = Action(
     icon = R.drawable.clipboard,
     name = R.string.action_paste_title,
     simplePressImpl = { manager, _ ->
-        if (org.futo.inputmethod.latin.HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
-            val context = manager.getContext()
-            val clipboard = context.getSystemService(ClipboardManager::class.java)
-            val clip = clipboard?.primaryClip
-            val item = if (clip != null && clip.itemCount > 0) clip.getItemAt(0) else null
-            val text = item?.coerceToText(context)?.toString()
-            val connection = manager.getLatinIMEForDebug().currentInputConnection
-            if (!text.isNullOrEmpty() && connection != null) {
-                connection.commitText(org.futo.inputmethod.latin.HaamidFormatter.format(text), 1)
-            } else {
-                manager.pasteFromClipboard()
-            }
-        } else {
-            manager.pasteFromClipboard()
-        }
+        // Pasting should not format text immediately. Automatic Title Case runs only
+        // when the user finishes through a supported editor action.
+        manager.pasteFromClipboard()
     },
     windowImpl = null,
 )

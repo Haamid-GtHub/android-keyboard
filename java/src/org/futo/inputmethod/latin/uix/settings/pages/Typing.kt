@@ -795,6 +795,39 @@ val KeyboardSettingsMenu = UserSettingsMenu(
     title = R.string.keyboard_settings_title,
     navPath = "keyboard", registerNavPath = true,
     settings = listOf(
+    settings = listOf(
+        UserSetting(
+            name = R.string.haamid_auto_title_case,
+            component = {
+                val context = LocalContext.current
+                val enabled = remember { mutableStateOf(HaamidFormattingSettings.isAutomaticFormattingEnabled()) }
+                SettingToggleRaw(
+                    title = stringResource(R.string.haamid_auto_title_case),
+                    subtitle = stringResource(R.string.haamid_auto_title_case_summary),
+                    enabled = enabled.value,
+                    setValue = {
+                        HaamidFormattingSettings.setAutomaticFormattingEnabled(context, it)
+                        enabled.value = it
+                    }
+                )
+            }
+        ),
+        UserSetting(
+            name = R.string.haamid_context_menu_title_case,
+            component = {
+                val context = LocalContext.current
+                val enabled = remember { mutableStateOf(HaamidFormattingSettings.isProcessTextEnabled(context)) }
+                SettingToggleRaw(
+                    title = stringResource(R.string.haamid_context_menu_title_case),
+                    subtitle = stringResource(R.string.haamid_context_menu_title_case_summary),
+                    enabled = enabled.value,
+                    setValue = {
+                        HaamidFormattingSettings.setProcessTextEnabled(context, it)
+                        enabled.value = it
+                    }
+                )
+            }
+        ),
         userSettingNavigationItem(
             title = R.string.size_settings_title,
             subtitle = R.string.size_settings_subtitle2,
@@ -857,35 +890,6 @@ val TypingSettingsMenu = UserSettingsMenu(
     title = R.string.typing_settings_title,
     navPath = "typing", registerNavPath = true,
     settings = listOf(
-        UserSetting(
-            name = R.string.haamid_title_case_settings,
-            component = {
-                val context = LocalContext.current
-                val autoEnabled = remember { mutableStateOf(HaamidFormattingSettings.isAutomaticFormattingEnabled()) }
-                val processTextEnabled = remember { mutableStateOf(HaamidFormattingSettings.isProcessTextEnabled(context)) }
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    SettingToggleRaw(
-                        title = stringResource(R.string.haamid_auto_title_case),
-                        subtitle = stringResource(R.string.haamid_auto_title_case_summary),
-                        enabled = autoEnabled.value,
-                        setValue = {
-                            HaamidFormattingSettings.setAutomaticFormattingEnabled(context, it)
-                            autoEnabled.value = it
-                        }
-                    )
-                    SettingToggleRaw(
-                        title = stringResource(R.string.haamid_context_menu_title_case),
-                        subtitle = stringResource(R.string.haamid_context_menu_title_case_summary),
-                        enabled = processTextEnabled.value,
-                        setValue = {
-                            HaamidFormattingSettings.setProcessTextEnabled(context, it)
-                            processTextEnabled.value = it
-                        }
-                    )
-                }
-            }
-        ),
         UserSetting(
             name = R.string.typing_settings_auto_space_mode,
             component = {

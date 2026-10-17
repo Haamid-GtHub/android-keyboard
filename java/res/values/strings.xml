@@ -282,7 +282,7 @@ mobile devices. [CHAR LIMIT=25] -->
     <string name="action_haamid_auto_format_disabled">Automatic Formatting Off</string>
     <string name="haamid_title_case_settings">Haamid Title Case</string>
     <string name="haamid_auto_title_case">Automatic Title Case</string>
-    <string name="haamid_auto_title_case_summary">Apply Title Case after typing pauses and when pasting text. Turn off to keep text unchanged unless you use the manual formatter.</string>
+    <string name="haamid_auto_title_case_summary">Apply Title Case once before supported keyboard actions such as Send, Done, Next, Search, and Go. Text is not rewritten while you type; some apps' separate Send buttons cannot be intercepted by the keyboard.</string>
     <string name="haamid_context_menu_title_case">Android Text Selection “Title Case”</string>
     <string name="haamid_context_menu_title_case_summary">Show the Title Case action in Android’s text-selection menu when the app supports PROCESS_TEXT actions.</string>
 </resources>

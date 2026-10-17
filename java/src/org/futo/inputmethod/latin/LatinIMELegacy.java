@@ -729,7 +729,8 @@ public class LatinIMELegacy implements KeyboardActionListener,
         if (isCompletionKey && editorInfo != null) {
             final int action = editorInfo.imeOptions & EditorInfo.IME_MASK_ACTION;
             if (action == EditorInfo.IME_ACTION_SEND || action == EditorInfo.IME_ACTION_DONE ||
-                    action == EditorInfo.IME_ACTION_GO) {
+                    action == EditorInfo.IME_ACTION_GO || action == EditorInfo.IME_ACTION_NEXT ||
+                    action == EditorInfo.IME_ACTION_PREVIOUS || action == EditorInfo.IME_ACTION_SEARCH) {
                 getLatinIME().formatHaamidTextBeforeCompletion();
             }
         }
