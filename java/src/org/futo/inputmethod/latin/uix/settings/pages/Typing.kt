@@ -799,6 +799,7 @@ val KeyboardSettingsMenu = UserSettingsMenu(
             name = R.string.haamid_auto_title_case,
             component = {
                 val context = LocalContext.current
+                HaamidFormattingSettings.initialize(context)
                 val enabled = remember { mutableStateOf(HaamidFormattingSettings.isAutomaticFormattingEnabled()) }
                 SettingToggleRaw(
                     title = stringResource(R.string.haamid_auto_title_case),
