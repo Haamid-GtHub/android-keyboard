@@ -794,6 +794,39 @@ val KeyboardSettingsMenu = UserSettingsMenu(
     title = R.string.keyboard_settings_title,
     navPath = "keyboard", registerNavPath = true,
     settings = listOf(
+        UserSetting(
+            name = R.string.haamid_auto_title_case,
+            component = {
+                val context = LocalContext.current
+                org.futo.inputmethod.latin.HaamidFormattingSettings.initialize(context)
+                val enabled = remember { mutableStateOf(org.futo.inputmethod.latin.HaamidFormattingSettings.isAutomaticFormattingEnabled()) }
+                SettingToggleRaw(
+                    title = stringResource(R.string.haamid_auto_title_case),
+                    subtitle = stringResource(R.string.haamid_auto_title_case_summary),
+                    enabled = enabled.value,
+                    setValue = {
+                        org.futo.inputmethod.latin.HaamidFormattingSettings.setAutomaticFormattingEnabled(context, it)
+                        enabled.value = it
+                    }
+                )
+            }
+        ),
+        UserSetting(
+            name = R.string.haamid_context_menu_title_case,
+            component = {
+                val context = LocalContext.current
+                val enabled = remember { mutableStateOf(org.futo.inputmethod.latin.HaamidFormattingSettings.isProcessTextEnabled(context)) }
+                SettingToggleRaw(
+                    title = stringResource(R.string.haamid_context_menu_title_case),
+                    subtitle = stringResource(R.string.haamid_context_menu_title_case_summary),
+                    enabled = enabled.value,
+                    setValue = {
+                        org.futo.inputmethod.latin.HaamidFormattingSettings.setProcessTextEnabled(context, it)
+                        enabled.value = it
+                    }
+                )
+            }
+        ),
         userSettingNavigationItem(
             title = R.string.size_settings_title,
             subtitle = R.string.size_settings_subtitle2,
