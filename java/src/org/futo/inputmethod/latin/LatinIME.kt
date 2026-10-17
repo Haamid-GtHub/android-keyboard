@@ -216,6 +216,8 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     private val haamidFormatHandler = Handler(Looper.getMainLooper())
     private val haamidFormatRunnable = Runnable { formatEditorTextAfterPause() }
     @Volatile private var haamidFormattingInProgress = false
+    private var haamidLastFormattedText: String? = null
+    private var haamidLastFormattedConnection: InputConnection? = null
 
     val colorScheme get() = activeColorScheme.value
     val keyboardColor get() = colorScheme.keyboardSurface.let { fallback ->
@@ -689,7 +691,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
             variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) return
 
-        haamidFormatHandler.postDelayed(haamidFormatRunnable, 1200L)
+        haamidFormatHandler.postDelayed(haamidFormatRunnable, 800L)
     }
 
     private fun formatEditorTextAfterPause() {
@@ -708,6 +710,10 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         if (extracted.selectionStart != original.length ||
             extracted.selectionEnd != original.length) return
 
+        // A selection/caret callback can also be caused by our own edit. Ignore the
+        // exact same completed snapshot to prevent formatter feedback loops.
+        if (haamidLastFormattedConnection === connection && haamidLastFormattedText == original) return
+
         val formatted = HaamidFormatter.format(original)
         if (formatted == original || currentInputConnection !== connection) return
 
@@ -715,8 +721,12 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         haamidFormatHandler.removeCallbacks(haamidFormatRunnable)
         connection.beginBatchEdit()
         try {
-            connection.setSelection(0, original.length)
+            // Replace the composing region instead of selecting the entire sentence/field.
+            // Explicit selection changes can trigger editor-specific rewrite loops.
+            connection.setComposingRegion(0, original.length)
             connection.commitText(formatted, 1)
+            haamidLastFormattedText = formatted
+            haamidLastFormattedConnection = connection
         } finally {
             connection.endBatchEdit()
             haamidFormattingInProgress = false
