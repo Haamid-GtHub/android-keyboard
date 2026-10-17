@@ -720,20 +720,6 @@ public class LatinIMELegacy implements KeyboardActionListener,
         final int keyY = mainKeyboardView.getKeyY(y);
         final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint),
                 keyX, keyY, isKeyRepeat);
-        // Format once before forwarding the keyboard's completion key. This works for text
-        // inserted by manual typing or a voice IME because both share the same editor field.
-        final EditorInfo editorInfo = getLatinIME().getCurrentInputEditorInfo();
-        final boolean isCompletionKey = codePoint == Constants.CODE_ENTER ||
-                codePoint == Constants.CODE_SHIFT_ENTER ||
-                (codePoint <= Constants.CODE_ACTION_0 && codePoint > Constants.CODE_ACTION_0 - 100);
-        if (isCompletionKey && editorInfo != null) {
-            final int action = editorInfo.imeOptions & EditorInfo.IME_MASK_ACTION;
-            if (action == EditorInfo.IME_ACTION_SEND || action == EditorInfo.IME_ACTION_DONE ||
-                    action == EditorInfo.IME_ACTION_GO || action == EditorInfo.IME_ACTION_NEXT ||
-                    action == EditorInfo.IME_ACTION_PREVIOUS || action == EditorInfo.IME_ACTION_SEARCH) {
-                getLatinIME().formatHaamidTextBeforeCompletion();
-            }
-        }
         onEvent(event);
     }
 
