@@ -720,6 +720,19 @@ public class LatinIMELegacy implements KeyboardActionListener,
         final int keyY = mainKeyboardView.getKeyY(y);
         final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint),
                 keyX, keyY, isKeyRepeat);
+        // Format once before forwarding the keyboard's completion key. This works for text
+        // inserted by manual typing or a voice IME because both share the same editor field.
+        final EditorInfo editorInfo = getLatinIME().getCurrentInputEditorInfo();
+        final boolean isCompletionKey = codePoint == Constants.CODE_ENTER ||
+                codePoint == Constants.CODE_SHIFT_ENTER ||
+                (codePoint <= Constants.CODE_ACTION_0 && codePoint > Constants.CODE_ACTION_0 - 100);
+        if (isCompletionKey && editorInfo != null) {
+            final int action = editorInfo.imeOptions & EditorInfo.IME_MASK_ACTION;
+            if (action == EditorInfo.IME_ACTION_SEND || action == EditorInfo.IME_ACTION_DONE ||
+                    action == EditorInfo.IME_ACTION_GO) {
+                getLatinIME().formatHaamidTextBeforeCompletion();
+            }
+        }
         onEvent(event);
     }
 
@@ -760,7 +773,7 @@ public class LatinIMELegacy implements KeyboardActionListener,
     @Override
     public void onTextInput(final String rawText) {
         // Do not title-case individual key/text events: that breaks acronyms and numeric tokens.
-        // Whole-field automatic formatting is debounced in LatinIME after the user pauses.
+        // Whole-field formatting happens only at a supported completion action.
         final Event event = Event.createSoftwareTextEvent(rawText, Constants.CODE_OUTPUT_TEXT);
         getActiveIME().onEvent(event);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState());
