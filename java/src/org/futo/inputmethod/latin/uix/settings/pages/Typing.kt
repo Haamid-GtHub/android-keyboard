@@ -84,7 +84,6 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 import org.futo.inputmethod.accessibility.AccessibilityUtils
 import org.futo.inputmethod.engine.IMESettingsMenu
-import org.futo.inputmethod.latin.HaamidFormattingSettings
 import org.futo.inputmethod.latin.HideKeyboardWhenHardKeyboardConnected
 import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.settings.LongPressKey
@@ -795,39 +794,6 @@ val KeyboardSettingsMenu = UserSettingsMenu(
     title = R.string.keyboard_settings_title,
     navPath = "keyboard", registerNavPath = true,
     settings = listOf(
-        UserSetting(
-            name = R.string.haamid_auto_title_case,
-            component = {
-                val context = LocalContext.current
-                HaamidFormattingSettings.initialize(context)
-                val enabled = remember { mutableStateOf(HaamidFormattingSettings.isAutomaticFormattingEnabled()) }
-                SettingToggleRaw(
-                    title = stringResource(R.string.haamid_auto_title_case),
-                    subtitle = stringResource(R.string.haamid_auto_title_case_summary),
-                    enabled = enabled.value,
-                    setValue = {
-                        HaamidFormattingSettings.setAutomaticFormattingEnabled(context, it)
-                        enabled.value = it
-                    }
-                )
-            }
-        ),
-        UserSetting(
-            name = R.string.haamid_context_menu_title_case,
-            component = {
-                val context = LocalContext.current
-                val enabled = remember { mutableStateOf(HaamidFormattingSettings.isProcessTextEnabled(context)) }
-                SettingToggleRaw(
-                    title = stringResource(R.string.haamid_context_menu_title_case),
-                    subtitle = stringResource(R.string.haamid_context_menu_title_case_summary),
-                    enabled = enabled.value,
-                    setValue = {
-                        HaamidFormattingSettings.setProcessTextEnabled(context, it)
-                        enabled.value = it
-                    }
-                )
-            }
-        ),
         userSettingNavigationItem(
             title = R.string.size_settings_title,
             subtitle = R.string.size_settings_subtitle2,
