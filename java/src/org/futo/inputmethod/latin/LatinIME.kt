@@ -686,7 +686,10 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         if (inputClass != android.text.InputType.TYPE_CLASS_TEXT) return
         if (variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
             variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) return
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+            variation == android.text.InputType.TYPE_TEXT_VARIATION_URI) return
 
         val extracted = connection.getExtractedText(ExtractedTextRequest(), 0) ?: return
         val original = extracted.text?.toString() ?: return
