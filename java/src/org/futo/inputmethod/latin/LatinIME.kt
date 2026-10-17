@@ -9,8 +9,6 @@ import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -212,12 +210,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     private val activeColorScheme = mutableStateOf(DefaultDarkScheme.obtainColors(this))
     private var pendingRecreateKeyboard: Boolean = false
 
-    // Apply title case to the complete editor text only after a typing pause.
-    private val haamidFormatHandler = Handler(Looper.getMainLooper())
-    private val haamidFormatRunnable = Runnable { formatEditorTextAfterPause() }
-    @Volatile private var haamidFormattingInProgress = false
-    private var haamidLastFormattedText: String? = null
-    private var haamidLastFormattedConnection: InputConnection? = null
+    // Title Case is applied only at a supported completion action, never on a typing pause.
 
     val colorScheme get() = activeColorScheme.value
     val keyboardColor get() = colorScheme.keyboardSurface.let { fallback ->
@@ -675,63 +668,40 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         uixManager.onInputFinishing()
     }
 
-    private fun scheduleHaamidFormatting(newSelStart: Int, newSelEnd: Int) {
-        haamidFormatHandler.removeCallbacks(haamidFormatRunnable)
-        if (haamidFormattingInProgress) return
+    /**
+     * Formats the whole editor once, immediately before a supported completion action.
+     * This deliberately is not called from selection/cursor callbacks, so typing does not
+     * trigger repeated whole-field rewrites.
+     */
+    fun formatHaamidTextBeforeCompletion() {
         if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) return
-        if (newSelStart < 0 || newSelStart != newSelEnd) return
-
+        val connection = currentInputConnection ?: return
         val editorInfo = currentInputEditorInfo ?: return
         val inputType = editorInfo.inputType
         val inputClass = inputType and android.text.InputType.TYPE_MASK_CLASS
         val variation = inputType and android.text.InputType.TYPE_MASK_VARIATION
-        // Never rewrite password fields or non-text editors.
         if (inputClass != android.text.InputType.TYPE_CLASS_TEXT) return
         if (variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
             variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
             variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) return
 
-        haamidFormatHandler.postDelayed(haamidFormatRunnable, 800L)
-    }
-
-    private fun formatEditorTextAfterPause() {
-        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) return
-        val connection = currentInputConnection ?: return
-        val editorInfo = currentInputEditorInfo ?: return
-        if ((editorInfo.inputType and android.text.InputType.TYPE_MASK_CLASS) !=
-            android.text.InputType.TYPE_CLASS_TEXT) return
-
         val extracted = connection.getExtractedText(ExtractedTextRequest(), 0) ?: return
         val original = extracted.text?.toString() ?: return
-        // Only handle a complete field snapshot. Do not accidentally replace a partial window.
         if (extracted.startOffset != 0 || extracted.partialStartOffset != -1 ||
             extracted.partialEndOffset != -1) return
-        // Keep cursor and selection safe: format only when the caret is at the end.
-        if (extracted.selectionStart != original.length ||
-            extracted.selectionEnd != original.length) return
-
-        // A selection/caret callback can also be caused by our own edit. Ignore the
-        // exact same completed snapshot to prevent formatter feedback loops.
-        if (haamidLastFormattedConnection === connection && haamidLastFormattedText == original) return
-
         val formatted = HaamidFormatter.format(original)
         if (formatted == original || currentInputConnection !== connection) return
 
-        haamidFormattingInProgress = true
-        haamidFormatHandler.removeCallbacks(haamidFormatRunnable)
         connection.beginBatchEdit()
         try {
-            // Replace the composing region instead of selecting the entire sentence/field.
-            // Explicit selection changes can trigger editor-specific rewrite loops.
-            connection.setComposingRegion(0, original.length)
+            // One replacement at completion only; never triggered by selection updates.
+            connection.setSelection(0, original.length)
             connection.commitText(formatted, 1)
-            haamidLastFormattedText = formatted
-            haamidLastFormattedConnection = connection
         } finally {
             connection.endBatchEdit()
-            haamidFormattingInProgress = false
         }
     }
+
     override fun onUpdateSelection(
         oldSelStart: Int,
         oldSelEnd: Int,
@@ -757,7 +727,6 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             candidatesStart,
             candidatesEnd
         )
-        scheduleHaamidFormatting(newSelStart, newSelEnd)
     }
 
     override fun onExtractedTextClicked() {
@@ -860,6 +829,14 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Hardware Enter is a completion opportunity when the editor uses a send/done action.
+        if (keyCode == KeyEvent.KEYCODE_ENTER) {
+            val action = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)
+            if (action == EditorInfo.IME_ACTION_SEND || action == EditorInfo.IME_ACTION_DONE ||
+                action == EditorInfo.IME_ACTION_GO) {
+                formatHaamidTextBeforeCompletion()
+            }
+        }
         return latinIMELegacy.onKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
     }
 
