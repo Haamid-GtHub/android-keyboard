@@ -84,6 +84,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 import org.futo.inputmethod.accessibility.AccessibilityUtils
 import org.futo.inputmethod.engine.IMESettingsMenu
+import org.futo.inputmethod.latin.HaamidFormattingSettings
 import org.futo.inputmethod.latin.HideKeyboardWhenHardKeyboardConnected
 import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.settings.LongPressKey
@@ -856,6 +857,35 @@ val TypingSettingsMenu = UserSettingsMenu(
     title = R.string.typing_settings_title,
     navPath = "typing", registerNavPath = true,
     settings = listOf(
+        UserSetting(
+            name = R.string.haamid_title_case_settings,
+            component = {
+                val context = LocalContext.current
+                val autoEnabled = remember { mutableStateOf(HaamidFormattingSettings.isAutomaticFormattingEnabled()) }
+                val processTextEnabled = remember { mutableStateOf(HaamidFormattingSettings.isProcessTextEnabled(context)) }
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    SettingToggleRaw(
+                        title = stringResource(R.string.haamid_auto_title_case),
+                        subtitle = stringResource(R.string.haamid_auto_title_case_summary),
+                        enabled = autoEnabled.value,
+                        setValue = {
+                            HaamidFormattingSettings.setAutomaticFormattingEnabled(context, it)
+                            autoEnabled.value = it
+                        }
+                    )
+                    SettingToggleRaw(
+                        title = stringResource(R.string.haamid_context_menu_title_case),
+                        subtitle = stringResource(R.string.haamid_context_menu_title_case_summary),
+                        enabled = processTextEnabled.value,
+                        setValue = {
+                            HaamidFormattingSettings.setProcessTextEnabled(context, it)
+                            processTextEnabled.value = it
+                        }
+                    )
+                }
+            }
+        ),
         UserSetting(
             name = R.string.typing_settings_auto_space_mode,
             component = {
