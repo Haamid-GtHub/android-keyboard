@@ -55,17 +55,33 @@ val HaamidFormatterAction = Action(
     name = R.string.action_haamid_formatter_title,
     simplePressImpl = { manager, _ ->
         val connection = manager.getLatinIMEForDebug().currentInputConnection
-        val selected = connection?.getSelectedText(0)
-        if (connection == null || selected.isNullOrEmpty()) {
-            manager.announce(manager.getContext().getString(R.string.action_haamid_formatter_select_text))
+        val context = manager.getContext()
+        if (connection == null) {
+            manager.announce(context.getString(R.string.action_haamid_formatter_select_text))
         } else {
-            connection.commitText(org.futo.inputmethod.latin.HaamidFormatter.format(selected.toString()), 1)
-            manager.announce(manager.getContext().getString(R.string.action_haamid_formatter_done))
+            val extracted = connection.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+            val original = extracted?.text?.toString()
+            // Refuse partial editor snapshots: replacing one would risk deleting unseen text.
+            if (original.isNullOrEmpty() || extracted.startOffset != 0 ||
+                extracted.partialStartOffset != -1 || extracted.partialEndOffset != -1) {
+                manager.announce(context.getString(R.string.action_haamid_formatter_select_text))
+            } else {
+                val formatted = org.futo.inputmethod.latin.HaamidFormatter.format(original)
+                if (formatted != original) {
+                    connection.beginBatchEdit()
+                    try {
+                        connection.setSelection(0, original.length)
+                        connection.commitText(formatted, 1)
+                    } finally {
+                        connection.endBatchEdit()
+                    }
+                }
+                manager.announce(context.getString(R.string.action_haamid_formatter_done))
+            }
         }
     },
     windowImpl = null,
 )
-
 
 /** Toggles automatic formatting for this app session; manual formatting remains available. */
 val HaamidAutoFormatToggleAction = Action(
