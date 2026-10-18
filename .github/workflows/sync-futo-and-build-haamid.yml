@@ -67,7 +67,7 @@ jobs:
         if: steps.sync.outputs.updated == 'true'
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Updated Haamid Keyboard APK
+      - name: Build Updated Haamid Keyboard Release APK
         if: steps.sync.outputs.updated == 'true'
         env:
           BRANCH_NAME: haamid-strict-title-case
@@ -76,13 +76,13 @@ jobs:
           export VERSION_CODE="$(( $(date -u +%Y%m%d) * 100 + GITHUB_RUN_NUMBER % 100 ))"
           export VERSION_NAME="0.0.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
           echo "Building version $VERSION_NAME (code $VERSION_CODE)"
-          ./gradlew assembleUnstableDebug --stacktrace
+          ./gradlew assembleUnstableRelease --stacktrace
 
       - name: Upload APK Artifact
         if: steps.sync.outputs.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: haamid-keyboard-unstable-debug-apk
+          name: haamid-keyboard-unstable-release-apk
           path: '**/build/outputs/apk/**/*.apk'
           if-no-files-found: error
           retention-days: 14
@@ -103,3 +103,20 @@ jobs:
           gh release create "$TAG" HaamidKeyboard.apk \
             --title "Haamid Keyboard Upstream Update ${DATE_TAG}" \
             --notes "Automatically built after syncing upstream FUTO source with Haamid's custom formatter. Install and test this update on your device. Android may require you to confirm installation."
+
+      - name: Publish Updated Release APK
+        if: steps.sync.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Built APK could not be found."
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+          DATE_TAG="$(date -u +%Y%m%d)"
+          TAG="haamid-upstream-${DATE_TAG}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Release ${DATE_TAG}" \
+            --notes "Release-variant sideload APK built after syncing upstream FUTO source with Haamid's custom formatter. This is not a Play Store release. Android may require confirmation to install it."
