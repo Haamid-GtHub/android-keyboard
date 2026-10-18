@@ -75,7 +75,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f | head -n 1)"
           if [ -z "$APK" ]; then
             echo "::error::Built APK could not be found."
             exit 1
