@@ -35,41 +35,71 @@ jobs:
           git fetch upstream master
 
       - name: Merge Upstream Without Overwriting Haamid Changes
+        id: sync
         run: |
+          before_sha="$(git rev-parse HEAD)"
           set +e
           git merge --no-edit upstream/master
           merge_status=$?
           set -e
-
           if [ "$merge_status" -ne 0 ]; then
             git merge --abort || true
             echo "::error::FUTO's update conflicts with custom Haamid changes. No merge was pushed. The conflict must be resolved before this update can be built."
             exit 1
           fi
-
-      - name: Push Updated Branch
-        run: git push origin HEAD:haamid-strict-title-case
+          after_sha="$(git rev-parse HEAD)"
+          if [ "$before_sha" = "$after_sha" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "No new FUTO changes. Skipping build and release."
+          else
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+            git push origin HEAD:haamid-strict-title-case
+          fi
 
       - name: Set Up Java
+        if: steps.sync.outputs.updated == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set Up Gradle
+        if: steps.sync.outputs.updated == 'true'
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Unstable Debug APK
+      - name: Build Updated Haamid Keyboard APK
+        if: steps.sync.outputs.updated == 'true'
         env:
-          VERSION_CODE: 1
-          VERSION_NAME: 0.0.0
           BRANCH_NAME: haamid-strict-title-case
-        run: ./gradlew assembleUnstableDebug --stacktrace
+        run: |
+          # Date-based version code stays above build 61 and increases for daily upstream updates.
+          export VERSION_CODE="$(( $(date -u +%Y%m%d) * 100 + GITHUB_RUN_NUMBER % 100 ))"
+          export VERSION_NAME="0.0.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          echo "Building version $VERSION_NAME (code $VERSION_CODE)"
+          ./gradlew assembleUnstableDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
+        if: steps.sync.outputs.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: haamid-keyboard-unstable-debug-apk
           path: '**/build/outputs/apk/**/*.apk'
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish Updated APK Release
+        if: steps.sync.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Built APK could not be found."
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+          DATE_TAG="$(date -u +%Y%m%d)"
+          TAG="haamid-upstream-${DATE_TAG}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Upstream Update ${DATE_TAG}" \
+            --notes "Automatically built after syncing upstream FUTO source with Haamid's custom formatter. Install and test this update on your device. Android may require you to confirm installation."
