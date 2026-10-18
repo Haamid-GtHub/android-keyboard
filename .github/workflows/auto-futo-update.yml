@@ -1,0 +1,99 @@
+name: Automatic FUTO Sync And Stable Build
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: automatic-futo-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Haamid Branch
+        uses: actions/checkout@v4
+        with:
+          ref: haamid-strict-title-case
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Check For FUTO Updates And Merge Safely
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/futo-org/android-keyboard.git
+          git fetch upstream master
+          NEW_COMMITS="$(git rev-list --count HEAD..upstream/master)"
+          echo "new_commits=$NEW_COMMITS" >> "$GITHUB_OUTPUT"
+          if [ "$NEW_COMMITS" -eq 0 ]; then
+            echo "No new FUTO commits. Nothing to build."
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_updates=true" >> "$GITHUB_OUTPUT"
+          echo "FUTO commits to integrate: $NEW_COMMITS"
+          git merge --no-edit upstream/master
+
+      - name: Set Up Java
+        if: steps.sync.outputs.has_updates == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set Up Gradle
+        if: steps.sync.outputs.has_updates == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set Automatic Version
+        if: steps.sync.outputs.has_updates == 'true'
+        shell: bash
+        run: |
+          VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Refresh Submodules
+        if: steps.sync.outputs.has_updates == 'true'
+        run: git submodule update --init --recursive
+
+      - name: Build Stable Release APK
+        if: steps.sync.outputs.has_updates == 'true'
+        run: ./gradlew assembleStableRelease --stacktrace
+
+      - name: Find And Prepare APK
+        if: steps.sync.outputs.has_updates == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Built APK could not be found."
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+
+      - name: Save Successfully Built Upstream Changes
+        if: steps.sync.outputs.has_updates == 'true'
+        run: git push origin HEAD:haamid-strict-title-case
+
+      - name: Publish Stable Release
+        if: steps.sync.outputs.has_updates == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="haamid-stable-auto-$VERSION_CODE"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Stable $VERSION_CODE" \
+            --notes "Automatically synced from FUTO upstream and built as a stable-flavor APK with Haamid's custom title-case features. Built only after a successful merge and build. This is a sideloadable release, not an official FUTO or Play Store release. Review and test before replacing your current keyboard."
