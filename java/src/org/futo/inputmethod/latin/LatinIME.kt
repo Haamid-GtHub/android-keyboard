@@ -9,6 +9,9 @@ import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -209,6 +212,13 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     private var activeThemeOption: ThemeOption? = null
     private val activeColorScheme = mutableStateOf(DefaultDarkScheme.obtainColors(this))
     private var pendingRecreateKeyboard: Boolean = false
+
+    // Apply Haamid Title Case to completed words after a short pause, without
+    // rewriting the active composing word or interfering with voice input.
+    private val haamidFormattingHandler = Handler(Looper.getMainLooper())
+    private var pendingHaamidFormatting: Runnable? = null
+    private var haamidFormattingGeneration = 0
+    private var isApplyingHaamidFormatting = false
 
     // Title Case is applied only at a supported completion action, never on a typing pause.
 
@@ -694,6 +704,131 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             candidatesStart,
             candidatesEnd
         )
+
+        scheduleHaamidManualFormatting(
+            oldSelEnd,
+            newSelStart,
+            newSelEnd,
+            candidatesStart,
+            candidatesEnd
+        )
+    }
+
+    private fun scheduleHaamidManualFormatting(
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        composingStart: Int,
+        composingEnd: Int
+    ) {
+        pendingHaamidFormatting?.let { haamidFormattingHandler.removeCallbacks(it) }
+        pendingHaamidFormatting = null
+        haamidFormattingGeneration += 1
+        val generation = haamidFormattingGeneration
+
+        if (isApplyingHaamidFormatting ||
+            !HaamidFormattingSettings.isAutomaticFormattingEnabled() ||
+            newSelStart != newSelEnd ||
+            newSelEnd <= oldSelEnd ||
+            (composingStart >= 0 && composingEnd >= 0 && composingStart != composingEnd) ||
+            !isHaamidFormattingSupportedField()
+        ) {
+            return
+        }
+
+        val task = Runnable {
+            if (generation != haamidFormattingGeneration ||
+                !HaamidFormattingSettings.isAutomaticFormattingEnabled() ||
+                !isHaamidFormattingSupportedField()
+            ) {
+                return@Runnable
+            }
+
+            val connection = currentInputConnection ?: return@Runnable
+            val beforeCursor = connection.getTextBeforeCursor(512, 0)?.toString()
+                ?: return@Runnable
+            if (beforeCursor.isEmpty()) return@Runnable
+
+            // Keep trailing whitespace unchanged, and only act after a word boundary
+            // (space or punctuation). This gives autocorrect a moment to finish first.
+            var tokenEnd = beforeCursor.length
+            while (tokenEnd > 0 && beforeCursor[tokenEnd - 1].isWhitespace()) {
+                tokenEnd--
+            }
+            if (tokenEnd == 0) return@Runnable
+
+            val lastTokenCharacter = beforeCursor[tokenEnd - 1]
+            val hasTrailingWhitespace = tokenEnd < beforeCursor.length
+            val isPunctuationBoundary = !lastTokenCharacter.isLetterOrDigit() &&
+                lastTokenCharacter != '\'' && lastTokenCharacter != '\u2019' &&
+                lastTokenCharacter != '-'
+            if (!hasTrailingWhitespace && !isPunctuationBoundary) return@Runnable
+
+            var tokenStart = tokenEnd
+            while (tokenStart > 0 && !beforeCursor[tokenStart - 1].isWhitespace()) {
+                tokenStart--
+            }
+
+            val token = beforeCursor.substring(tokenStart, tokenEnd)
+            if (token.isEmpty() || token.none { it.isLetter() }) return@Runnable
+
+            val lowerToken = token.lowercase()
+            // Avoid changing email addresses and URLs pasted or typed into ordinary fields.
+            if (token.contains('@') ||
+                lowerToken.contains("://") ||
+                lowerToken.startsWith("www.") ||
+                lowerToken.startsWith("mailto:")
+            ) {
+                return@Runnable
+            }
+
+            val formattedToken = HaamidFormatter.format(token)
+            if (formattedToken == token) return@Runnable
+
+            val trailingText = beforeCursor.substring(tokenEnd)
+            val originalText = token + trailingText
+            val replacementText = formattedToken + trailingText
+            val deleteLength = originalText.length
+
+            // Replace only the completed token and its trailing spaces, never the whole field.
+            // Restore the original content if the editor rejects the replacement.
+            isApplyingHaamidFormatting = true
+            try {
+                if (!connection.deleteSurroundingText(deleteLength, 0)) {
+                    return@Runnable
+                }
+                if (!connection.commitText(replacementText, 1)) {
+                    connection.commitText(originalText, 1)
+                }
+            } finally {
+                isApplyingHaamidFormatting = false
+            }
+        }
+
+        pendingHaamidFormatting = task
+        haamidFormattingHandler.postDelayed(task, 300L)
+    }
+
+    private fun isHaamidFormattingSupportedField(): Boolean {
+        val inputType = currentInputEditorInfo?.inputType ?: return false
+        val inputClass = inputType and InputType.TYPE_MASK_CLASS
+        val variation = inputType and InputType.TYPE_MASK_VARIATION
+
+        if (inputClass == InputType.TYPE_CLASS_NUMBER ||
+            inputClass == InputType.TYPE_CLASS_PHONE
+        ) {
+            return false
+        }
+
+        if (inputClass == InputType.TYPE_CLASS_TEXT) {
+            return variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS &&
+                variation != InputType.TYPE_TEXT_VARIATION_URI &&
+                variation != InputType.TYPE_TEXT_VARIATION_PASSWORD &&
+                variation != InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD &&
+                variation != InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+        }
+
+        return true
     }
 
     override fun onExtractedTextClicked() {
