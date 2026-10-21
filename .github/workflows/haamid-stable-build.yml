@@ -1,0 +1,86 @@
+name: Haamid Stable APK
+
+on:
+  push:
+    branches:
+      - haamid-strict-title-case
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      BRANCH_NAME: haamid-strict-title-case
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build components
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Set version for this build
+        shell: bash
+        run: |
+          BUILD_NUMBER=$((92 + GITHUB_RUN_NUMBER))
+          echo "VERSION_CODE=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "BUILD_TAG=haamid-stable-$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Build stable APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleStableDebug --no-daemon --stacktrace
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          APK="$(find build/outputs/apk/stable/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          if [ -z "$APK" ]; then
+            echo "Stable APK was not produced."
+            find build/outputs/apk -maxdepth 4 -type f -print || true
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HaamidKeyboard-${{ env.BUILD_TAG }}
+          path: HaamidKeyboard.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$BUILD_TAG" >/dev/null 2>&1; then
+            gh release upload "$BUILD_TAG" HaamidKeyboard.apk --clobber
+          else
+            gh release create "$BUILD_TAG" HaamidKeyboard.apk \
+              --title "Haamid Keyboard Stable $VERSION_CODE" \
+              --notes "Haamid Title Case formatter update. Built from branch haamid-strict-title-case. The APK uses the repository's shared signing keystore."
+          fi
