@@ -2800,7 +2800,10 @@ public final class InputLogic {
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
         boolean automaticFormattingChangedText = false;
-        if (shouldApplyHaamidAutomaticFormatting()) {
+        // A manually accepted suggestion is the user's explicit choice. Do not
+        // reformat it after selection; commit the suggestion exactly as provided.
+        if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+                && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidFormatter.formatAutomatic(chosenWord);
             if (!formatted.equals(chosenWord)) {
                 wordToCommit = formatted;
