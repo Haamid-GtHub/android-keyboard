@@ -15,7 +15,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.CompletionInfo
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputConnection
@@ -384,7 +383,6 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
 
     override fun onCreate() {
         super.onCreate()
-        HaamidFormattingSettings.initialize(this)
 
         UserBinaryDictionary.resetUserDictionariesRequiringRecreation()
 
@@ -645,7 +643,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     }
 
     override fun onFinishInput() {
-        // Formatting is manual only. Do not rewrite editor text when input focus finishes.
+        // Do not rewrite editor text merely because input focus finishes.
         super.onFinishInput()
         latinIMELegacy.onFinishInput()
         uixManager.onInputFinishing()
@@ -695,10 +693,10 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
 
     }
 
-    // Manual typing is intentionally not rewritten after an idle pause. Whole-field replacement
-    // can disrupt editor state, autocorrect, cursor position, and external voice input. Built-in
-    // FUTO voice output is formatted at its explicit completion callback; other input can use the
-    // manual Title Case action or Android's PROCESS_TEXT selection action.
+    // Manual typing is formatted only at explicit completion actions, not after an idle pause.
+    // This avoids disrupting editor state, autocorrect, cursor position, and external voice input.
+    // Built-in FUTO voice output is formatted at its explicit completion callback; the manual
+    // Title Case action remains available for other input.
 
     override fun onExtractedTextClicked() {
         latinIMELegacy.onExtractedTextClicked()
