@@ -48,7 +48,7 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         String eventPackage = event.getPackageName().toString();
 
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (isGoogleVoicePackage(eventPackage)) {
+            if (isGoogleVoiceWindowEvent(event, eventPackage)) {
                 waitingForGoogleVoiceText = true;
                 baselineText = null;
                 expectedText = null;
@@ -192,6 +192,28 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         return "com.google.android.googlequicksearchbox".equals(packageName)
                 || "com.google.android.voicesearch".equals(packageName)
                 || packageName.startsWith("com.google.android.apps.gsa");
+    }
+
+    private static boolean isGoogleVoiceWindowEvent(AccessibilityEvent event, String packageName) {
+        if (!isGoogleVoicePackage(packageName)) return false;
+
+        String className = event.getClassName() == null
+                ? "" : event.getClassName().toString().toLowerCase(java.util.Locale.ROOT);
+        if (className.contains("voice") || className.contains("speech")
+                || className.contains("recognition") || className.contains("dictation")) {
+            return true;
+        }
+
+        // Some Google builds expose the voice prompt as event text rather than a useful class name.
+        for (CharSequence item : event.getText()) {
+            if (item == null) continue;
+            String text = item.toString().toLowerCase(java.util.Locale.ROOT);
+            if (text.contains("listening") || text.contains("speak now")
+                    || text.contains("try saying") || text.contains("voice typing")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void resetSession() {
