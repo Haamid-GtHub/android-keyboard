@@ -1,0 +1,114 @@
+name: Sync FUTO Source And Build Haamid Keyboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: haamid-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Haamid branch and submodules
+        uses: actions/checkout@v4
+        with:
+          ref: haamid-strict-title-case
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/futo-org/android-keyboard.git
+          git fetch upstream master
+
+      - name: Merge latest FUTO source safely
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          COUNT="$(git rev-list --count HEAD..upstream/master)"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new FUTO commits found."
+            exit 0
+          fi
+
+          # Fail safely on conflicts. Never overwrite Haamid customizations automatically.
+          if ! git merge --no-edit upstream/master; then
+            git merge --abort || true
+            echo "::error::FUTO updates conflict with Haamid customizations. No source update was pushed; resolve the conflict manually."
+            exit 1
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Stop if FUTO source is already current
+        if: steps.sync.outputs.changed != 'true'
+        run: echo "No new upstream source changes; no rebuild is needed."
+
+      - name: Set up Java
+        if: steps.sync.outputs.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        if: steps.sync.outputs.changed == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build stable release APK
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          VERSION_CODE: ${{ 30000 + github.run_number }}
+          VERSION_NAME: 0.0.${{ 30000 + github.run_number }}
+          BRANCH_NAME: haamid-strict-title-case
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleStableRelease --no-daemon --stacktrace
+
+      - name: Prepare APK
+        if: steps.sync.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Built APK could not be found."
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+
+      - name: Upload APK artifact
+        if: steps.sync.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: HaamidKeyboard-auto-${{ github.run_number }}
+          path: HaamidKeyboard.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Push tested source update
+        if: steps.sync.outputs.changed == 'true'
+        run: git push origin HEAD:haamid-strict-title-case
+
+      - name: Publish APK release
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="haamid-auto-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Automatic Update ${GITHUB_RUN_NUMBER}" \
+            --notes "Built after merging new FUTO source changes with Haamid's custom formatter changes. Build success does not replace real-device testing. If the source merge conflicts, the workflow stops instead of overwriting customizations."
