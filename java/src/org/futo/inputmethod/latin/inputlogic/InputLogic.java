@@ -562,6 +562,13 @@ public final class InputLogic {
             return false;
         }
 
+        // A real editor cursor move with no active composing span usually means the
+        // user tapped into existing text to edit it. Preserve their next capitalization.
+        if ((oldSelStart != newSelStart || oldSelEnd != newSelEnd)
+                && composingStart < 0 && composingEnd < 0) {
+            rememberHaamidCursorEditIfInsideWord();
+        }
+
         // TODO: the following is probably better done in resetEntireInputState().
         // it should only happen when the cursor moved, and the very purpose of the
         // test below is to narrow down whether this happened or not. Likewise with
