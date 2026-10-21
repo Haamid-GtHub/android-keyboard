@@ -131,6 +131,8 @@ public final class InputLogic {
     // TODO: This boolean is persistent state and causes large side effects at unexpected times.
     // Find a way to remove it for readability.
     private boolean mIsAutoCorrectionIndicatorOn;
+    // Preserve deliberate edits when the user moves the cursor into existing text.
+    private boolean mHaamidSkipNextAutomaticFormatting;
     private long mDoubleSpacePeriodCountdownStart;
 
     // The word being corrected while the cursor is in the middle of the word.
@@ -2800,9 +2802,12 @@ public final class InputLogic {
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
         boolean automaticFormattingChangedText = false;
-        // A manually accepted suggestion is the user's explicit choice. Do not
-        // reformat it after selection; commit the suggestion exactly as provided.
-        if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+        // A manually accepted suggestion or a word being edited at a moved cursor
+        // is the user's explicit choice. Preserve it instead of reformatting it.
+        final boolean skipHaamidFormatting = mHaamidSkipNextAutomaticFormatting;
+        mHaamidSkipNextAutomaticFormatting = false;
+        if (!skipHaamidFormatting
+                && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK
                 && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidFormatter.formatAutomatic(chosenWord);
             if (!formatted.equals(chosenWord)) {
@@ -2991,12 +2996,35 @@ public final class InputLogic {
     }
 
 
+    private void rememberHaamidCursorEditIfInsideWord() {
+        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
+            return;
+        }
+        if (mConnection.hasSelection()) {
+            mHaamidSkipNextAutomaticFormatting = true;
+            return;
+        }
+        final CharSequence before = mConnection.getTextBeforeCursor(1, 0);
+        final CharSequence after = mConnection.getTextAfterCursor(1, 0);
+        mHaamidSkipNextAutomaticFormatting =
+                isHaamidWordCharacter(before) || isHaamidWordCharacter(after);
+    }
+
+    private boolean isHaamidWordCharacter(final CharSequence text) {
+        if (text == null || text.length() == 0) {
+            return false;
+        }
+        final char ch = text.charAt(0);
+        return Character.isLetterOrDigit(ch) || ch == '\'' || ch == '\u2019';
+    }
+
     private void cursorLeftInternal(int steps, boolean stepOverWords, boolean select) {
         resetInput();
 
         if(!mConnection.hasSelection()) isRightSidePointer = true;
 
         cursorStep(-steps, stepOverWords, select);
+        rememberHaamidCursorEditIfInsideWord();
     }
 
     private void cursorRightInternal(int steps, boolean stepOverWords, boolean select) {
@@ -3005,8 +3033,8 @@ public final class InputLogic {
         if(!mConnection.hasSelection()) isRightSidePointer = false;
 
         cursorStep(steps, stepOverWords, select);
+        rememberHaamidCursorEditIfInsideWord();
     }
-
 
     /**
      * Shifts the cursor left by a number of characters
