@@ -71,12 +71,17 @@ jobs:
         if: steps.sync.outputs.changed == 'true'
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Set build version
+        if: steps.sync.outputs.changed == 'true'
+        shell: bash
+        run: |
+          VERSION_CODE=$((30000 + GITHUB_RUN_NUMBER))
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
+
       - name: Build stable release APK
         if: steps.sync.outputs.changed == 'true'
-        env:
-          VERSION_CODE: ${{ 30000 + github.run_number }}
-          VERSION_NAME: 0.0.${{ 30000 + github.run_number }}
-          BRANCH_NAME: haamid-strict-title-case
         run: |
           chmod +x ./gradlew
           ./gradlew assembleStableRelease --no-daemon --stacktrace
