@@ -1,7 +1,5 @@
 package org.futo.inputmethod.latin.uix.actions
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.view.KeyEvent
 import android.widget.Toast
 import org.futo.inputmethod.latin.R
