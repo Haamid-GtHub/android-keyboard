@@ -31,4 +31,23 @@ public final class HaamidFormatterTests extends AndroidTestCase {
     public void testPreservesWordsBeginningWithDigits() {
         assertEquals("4g 5GHz 802.11ac", HaamidFormatter.format("4g 5GHz 802.11ac"));
     }
+
+    public void testAutomaticFormattingTitleCasesOrdinaryText() {
+        assertEquals("Hello World", HaamidFormatter.formatAutomatic("hello world"));
+    }
+
+    public void testAutomaticFormattingPreservesIntentionalUppercase() {
+        assertEquals("HELLO WORLD", HaamidFormatter.formatAutomatic("HELLO WORLD"));
+        assertEquals("Hello WORLD", HaamidFormatter.formatAutomatic("hello WORLD"));
+    }
+
+    public void testAutomaticFormattingPreservesAcronymsAndMixedCaseNames() {
+        assertEquals("NASA And CPU iPhone ChatGPT",
+                HaamidFormatter.formatAutomatic("NASA and CPU iPhone ChatGPT"));
+    }
+
+    public void testAutomaticFormattingPreservesUppercaseLinesOnly() {
+        assertEquals("HELLO WORLD\\nHello World",
+                HaamidFormatter.formatAutomatic("HELLO WORLD\\nhello world"));
+    }
 }
