@@ -1,6 +1,9 @@
 name: Sync FUTO Source And Build Haamid Keyboard
 
 on:
+  push:
+    branches:
+      - haamid-strict-title-case
   workflow_dispatch:
   schedule:
     - cron: "17 4 * * *"
