@@ -488,11 +488,22 @@ public final class WordComposer {
     // committedWord should contain suggestion spans if applicable.
     public LastComposedWord commitWord(final int type, final CharSequence committedWord,
             final String separatorString, final NgramContext ngramContext) {
+        return commitWord(type, committedWord, separatorString, ngramContext,
+                mTypedWordCache.toString());
+    }
+
+    /**
+     * Commits a word while optionally recording its normalized text as the typed word.
+     * This keeps automatic case-only formatting from looking like an autocorrection.
+     */
+    public LastComposedWord commitWord(final int type, final CharSequence committedWord,
+            final String separatorString, final NgramContext ngramContext,
+            final String typedWordForTracking) {
         // Note: currently, we come here whenever we commit a word. If it's a MANUAL_PICK
         // or a DECIDED_WORD we may cancel the commit later; otherwise, we should deactivate
         // the last composed word to ensure this does not happen.
         final LastComposedWord lastComposedWord = new LastComposedWord(mEvents,
-                mInputPointers, mTypedWordCache.toString(), committedWord, separatorString,
+                mInputPointers, typedWordForTracking, committedWord, separatorString,
                 ngramContext, mCapitalizedMode);
         mInputPointers.reset();
         if (type != LastComposedWord.COMMIT_TYPE_DECIDED_WORD
