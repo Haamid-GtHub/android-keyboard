@@ -282,7 +282,5 @@ mobile devices. [CHAR LIMIT=25] -->
     <string name="action_haamid_auto_format_disabled">Automatic Formatting Off</string>
     <string name="haamid_title_case_settings">Haamid Title Case</string>
     <string name="haamid_auto_title_case">Automatic Title Case</string>
-    <string name="haamid_auto_title_case_summary">Automatically apply Haamid Title Case to completed results from built-in FUTO voice typing. Manual typing is not rewritten automatically.</string>
-    <string name="haamid_context_menu_title_case">Android Text Selection Title Case</string>
-    <string name="haamid_context_menu_title_case_summary">Show the Title Case action in the Android text-selection menu when the app supports PROCESS_TEXT actions.</string>
+    <string name="haamid_auto_title_case_summary">Automatically apply Haamid Title Case to completed built-in FUTO voice results and when you finish typing with Send or Done in supported text fields. The manual Title Case action remains available.</string>
 </resources>
