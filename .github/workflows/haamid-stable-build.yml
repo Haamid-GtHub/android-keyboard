@@ -32,9 +32,8 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # GitHub-hosted Ubuntu runners already provide ANDROID_HOME and sdkmanager.
+      # Avoid setup-android's deprecated "tools" package install, which now fails.
       - name: Install Android build components
         run: |
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
