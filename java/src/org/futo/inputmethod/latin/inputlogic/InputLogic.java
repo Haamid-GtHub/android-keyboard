@@ -17,6 +17,7 @@
 package org.futo.inputmethod.latin.inputlogic;
 
 import android.os.SystemClock;
+import android.text.InputType;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.SuggestionSpan;
@@ -36,6 +37,8 @@ import org.futo.inputmethod.keyboard.Keyboard;
 import org.futo.inputmethod.keyboard.KeyboardSwitcher;
 import org.futo.inputmethod.latin.BinaryDictionary;
 import org.futo.inputmethod.latin.DictionaryFacilitator;
+import org.futo.inputmethod.latin.HaamidFormatter;
+import org.futo.inputmethod.latin.HaamidFormattingSettings;
 import org.futo.inputmethod.latin.LastComposedWord;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
@@ -2421,7 +2424,95 @@ public final class InputLogic {
      */
     private void performEditorAction(final int actionId) {
         rememberCommittedEmail();
+
+        // Format only at an explicit completion action, when the keyboard knows the user
+        // is finished. Do not rewrite text on a timer or during active composition.
+        if (actionId != EditorInfo.IME_ACTION_NEXT
+                && actionId != EditorInfo.IME_ACTION_PREVIOUS
+                && actionId != EditorInfo.IME_ACTION_NONE) {
+            formatCompletedTextBeforeEditorAction();
+        }
+
         mConnection.performEditorAction(actionId);
+    }
+
+    /**
+     * Applies Haamid Title Case to a complete text field immediately before a completion action.
+     * This is intentionally conservative: only format when the cursor is collapsed at the end,
+     * the full field is available, and the field is not a numeric, password, email, or URL field.
+     * If the editor cannot provide a complete snapshot, leave the text untouched.
+     */
+    private void formatCompletedTextBeforeEditorAction() {
+        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
+            return;
+        }
+
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo == null) {
+            return;
+        }
+
+        final int inputType = editorInfo.inputType;
+        final int inputClass = inputType & InputType.TYPE_MASK_CLASS;
+        final int variation = inputType & InputType.TYPE_MASK_VARIATION;
+
+        if (inputClass == InputType.TYPE_CLASS_NUMBER
+                || inputClass == InputType.TYPE_CLASS_PHONE) {
+            return;
+        }
+
+        if (inputClass == InputType.TYPE_CLASS_TEXT
+                && (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                || variation == InputType.TYPE_TEXT_VARIATION_URI
+                || variation == InputType.TYPE_TEXT_VARIATION_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)) {
+            return;
+        }
+
+        final int selectionStart = mConnection.getExpectedSelectionStart();
+        final int selectionEnd = mConnection.getExpectedSelectionEnd();
+        if (selectionStart < 0 || selectionStart != selectionEnd) {
+            return;
+        }
+
+        // Only format when the caret is at the end of the field. A null result means the
+        // editor did not provide enough information, so we must not guess.
+        final CharSequence afterCursor = mConnection.getTextAfterCursor(1, 0);
+        if (afterCursor == null || afterCursor.length() != 0) {
+            return;
+        }
+
+        final CharSequence beforeCursor = mConnection.getTextBeforeCursor(8192, 0);
+        if (beforeCursor == null || beforeCursor.length() == 0
+                || beforeCursor.length() >= 8192
+                || beforeCursor.length() != selectionStart) {
+            return;
+        }
+
+        final String originalText = beforeCursor.toString();
+        final String lowerText = originalText.toLowerCase(Locale.ROOT);
+        // Do not risk changing a URL or email address. The manual action remains available.
+        if (originalText.indexOf('@') >= 0
+                || lowerText.contains("://")
+                || lowerText.contains("www.")
+                || lowerText.contains("mailto:")) {
+            return;
+        }
+
+        final String formattedText = HaamidFormatter.format(originalText);
+        if (formattedText.equals(originalText)) {
+            return;
+        }
+
+        mConnection.beginBatchEdit();
+        try {
+            if (mConnection.setSelection(0, originalText.length())) {
+                mConnection.commitText(formattedText, 1);
+            }
+        } finally {
+            mConnection.endBatchEdit();
+        }
     }
 
     /**
