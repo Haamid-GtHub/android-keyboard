@@ -736,6 +736,9 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             return
         }
 
+        // Manual typing has no explicit "finished" callback like voice input. Debounce edits
+        // and format the whole text before the cursor, so the formatter's whole-text uppercase
+        // rule and acronym behavior remain intact instead of treating each word independently.
         val task = Runnable {
             if (generation != haamidFormattingGeneration ||
                 !HaamidFormattingSettings.isAutomaticFormattingEnabled() ||
@@ -745,59 +748,35 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             }
 
             val connection = currentInputConnection ?: return@Runnable
-            val beforeCursor = connection.getTextBeforeCursor(512, 0)?.toString()
+            // Only format when the cursor is at the end. Never replace text around a cursor
+            // in the middle of a message or overwrite text that is after the cursor.
+            if (!connection.getTextAfterCursor(1, 0).isNullOrEmpty()) return@Runnable
+
+            val originalText = connection.getTextBeforeCursor(4096, 0)?.toString()
                 ?: return@Runnable
-            if (beforeCursor.isEmpty()) return@Runnable
+            if (originalText.isEmpty() || originalText.length >= 4096) return@Runnable
 
-            // Keep trailing whitespace unchanged, and only act after a word boundary
-            // (space or punctuation). This gives autocorrect a moment to finish first.
-            var tokenEnd = beforeCursor.length
-            while (tokenEnd > 0 && beforeCursor[tokenEnd - 1].isWhitespace()) {
-                tokenEnd--
-            }
-            if (tokenEnd == 0) return@Runnable
-
-            val lastTokenCharacter = beforeCursor[tokenEnd - 1]
-            val hasTrailingWhitespace = tokenEnd < beforeCursor.length
-            val isPunctuationBoundary = !lastTokenCharacter.isLetterOrDigit() &&
-                lastTokenCharacter != '\'' && lastTokenCharacter != '\u2019' &&
-                lastTokenCharacter != '-'
-            if (!hasTrailingWhitespace && !isPunctuationBoundary) return@Runnable
-
-            var tokenStart = tokenEnd
-            while (tokenStart > 0 && !beforeCursor[tokenStart - 1].isWhitespace()) {
-                tokenStart--
-            }
-
-            val token = beforeCursor.substring(tokenStart, tokenEnd)
-            if (token.isEmpty() || token.none { it.isLetter() }) return@Runnable
-
-            val lowerToken = token.lowercase()
-            // Avoid changing email addresses and URLs pasted or typed into ordinary fields.
-            if (token.contains('@') ||
-                lowerToken.contains("://") ||
-                lowerToken.startsWith("www.") ||
-                lowerToken.startsWith("mailto:")
+            // Avoid rewriting a field containing an email address or URL.
+            val lowerText = originalText.lowercase()
+            if (originalText.contains('@') ||
+                lowerText.contains("://") ||
+                lowerText.contains("www.") ||
+                lowerText.contains("mailto:")
             ) {
                 return@Runnable
             }
 
-            val formattedToken = HaamidFormatter.format(token)
-            if (formattedToken == token) return@Runnable
+            val formattedText = HaamidFormatter.format(originalText)
+            if (formattedText == originalText) return@Runnable
 
-            val trailingText = beforeCursor.substring(tokenEnd)
-            val originalText = token + trailingText
-            val replacementText = formattedToken + trailingText
-            val deleteLength = originalText.length
-
-            // Replace only the completed token and its trailing spaces, never the whole field.
-            // Restore the original content if the editor rejects the replacement.
+            // Replace the text once, only after a pause, and restore the original if the editor
+            // rejects the replacement. The active composing word was excluded above.
             isApplyingHaamidFormatting = true
             try {
-                if (!connection.deleteSurroundingText(deleteLength, 0)) {
+                if (!connection.deleteSurroundingText(originalText.length, 0)) {
                     return@Runnable
                 }
-                if (!connection.commitText(replacementText, 1)) {
+                if (!connection.commitText(formattedText, 1)) {
                     connection.commitText(originalText, 1)
                 }
             } finally {
@@ -806,7 +785,7 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
         }
 
         pendingHaamidFormatting = task
-        haamidFormattingHandler.postDelayed(task, 300L)
+        haamidFormattingHandler.postDelayed(task, 1200L)
     }
 
     private fun isHaamidFormattingSupportedField(): Boolean {
