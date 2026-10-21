@@ -56,6 +56,10 @@ jobs:
         if: steps.sync.outputs.changed != 'true'
         run: echo "No new upstream source changes; no rebuild is needed."
 
+      - name: Update submodules to merged FUTO revisions
+        if: steps.sync.outputs.changed == 'true'
+        run: git submodule update --init --recursive
+
       - name: Set up Java
         if: steps.sync.outputs.changed == 'true'
         uses: actions/setup-java@v4
