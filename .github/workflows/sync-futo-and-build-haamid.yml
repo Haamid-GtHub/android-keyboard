@@ -1,4 +1,4 @@
-name: Sync FUTO Updates And Build Haamid Keyboard
+name: Sync FUTO Updates And Build Stable Haamid Keyboard
 
 on:
   workflow_dispatch:
@@ -59,17 +59,17 @@ jobs:
       - name: Set Up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Unstable Debug APK
+      - name: Build Stable Release APK
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: 0.0.${{ github.run_number }}
           BRANCH_NAME: haamid-strict-title-case
-        run: ./gradlew assembleUnstableDebug --stacktrace
+        run: ./gradlew assembleStableRelease --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: haamid-keyboard-unstable-debug-apk
+          name: haamid-keyboard-stable-release-apk
           path: '**/build/outputs/apk/**/*.apk'
           if-no-files-found: error
           retention-days: 14
@@ -84,5 +84,8 @@ jobs:
             echo "::error::Built APK could not be found."
             exit 1
           fi
-          TAG="haamid-build-$VERSION_CODE"
-          gh release create "$TAG" "$APK"             --title "Haamid Keyboard Build $VERSION_CODE"             --notes "Automated build of the Haamid title-case keyboard from the custom branch after syncing FUTO upstream. This is a test build; confirm formatting on-device before relying on it."
+          cp "$APK" HaamidKeyboard.apk
+          TAG="haamid-stable-auto-$VERSION_CODE"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Stable Auto $VERSION_CODE" \
+            --notes "Stable-flavor sideloadable APK built after merging the latest FUTO upstream changes into Haamid's custom Title Case branch. This is not a Play Store-published or Play Store-signed app. Android may require the user to confirm installation; it does not silently update an installed app."
