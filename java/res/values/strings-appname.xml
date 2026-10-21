@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Application name for the keyboard. "FUTO" should not be translated. -->
-    <string name="english_ime_name">FUTO Keyboard</string>
+    <!-- Application name for Haamid's customized Title Case keyboard. -->
+    <string name="english_ime_name">Haamid Keyboard</string>
 
     <!-- Name of Android spell checker service. "FUTO" should not be translated. -->
     <string name="spell_checker_service_name">FUTO Spell Checker</string>
 
-    <!-- Title for Android Keyboard settings screen. "FUTO" should not be translated. -->
-    <string name="english_ime_settings">FUTO Keyboard Settings</string>
+    <!-- Title for Haamid Keyboard settings screen. -->
+    <string name="english_ime_settings">Haamid Keyboard Settings</string>
 
     <!-- Title for the spell checking service settings screen. "FUTO" should not be translated. -->
     <string name="android_spell_checker_settings">FUTO Spell Checker Settings</string>
