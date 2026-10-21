@@ -750,7 +750,8 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             val connection = currentInputConnection ?: return@Runnable
             // Only format when the cursor is at the end. Never replace text around a cursor
             // in the middle of a message or overwrite text that is after the cursor.
-            if (!connection.getTextAfterCursor(1, 0).isNullOrEmpty()) return@Runnable
+            val afterCursor = connection.getTextAfterCursor(1, 0) ?: return@Runnable
+            if (afterCursor.isNotEmpty()) return@Runnable
 
             val originalText = connection.getTextBeforeCursor(4096, 0)?.toString()
                 ?: return@Runnable
