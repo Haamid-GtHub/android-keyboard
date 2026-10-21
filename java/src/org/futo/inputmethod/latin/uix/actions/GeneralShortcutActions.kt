@@ -38,8 +38,8 @@ val PasteAction = Action(
     icon = R.drawable.clipboard,
     name = R.string.action_paste_title,
     simplePressImpl = { manager, _ ->
-        // Pasting should not format text immediately. Automatic Title Case runs only
-        // when the user finishes through a supported editor action.
+        // Leave pasted content unchanged. Automatic formatting is applied at supported
+        // editor completion actions or when built-in FUTO voice input finishes.
         manager.pasteFromClipboard()
     },
     windowImpl = null,
