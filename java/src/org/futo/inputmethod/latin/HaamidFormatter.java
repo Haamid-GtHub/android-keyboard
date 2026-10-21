@@ -16,6 +16,26 @@ public final class HaamidFormatter {
     private HaamidFormatter() {
     }
 
+    /**
+     * Automatic formatting preserves each entirely-uppercase line as the user typed it.
+     * Other lines use the regular formatter. Manual formatting continues to use format().
+     */
+    public static String formatAutomatic(String text) {
+        StringBuilder result = new StringBuilder();
+        int start = 0;
+        for (int i = 0; i <= text.length(); i++) {
+            if (i == text.length() || text.charAt(i) == '\n') {
+                String line = text.substring(start, i);
+                result.append(isEntireTextUppercase(line) ? line : format(line));
+                if (i < text.length()) {
+                    result.append('\n');
+                }
+                start = i + 1;
+            }
+        }
+        return result.toString();
+    }
+
     public static String format(String text) {
         boolean entireTextUppercase = isEntireTextUppercase(text);
 
