@@ -47,7 +47,7 @@ public final class HaamidFormatterTests extends AndroidTestCase {
     }
 
     public void testAutomaticFormattingPreservesUppercaseLinesOnly() {
-        assertEquals("HELLO WORLD\\nHello World",
-                HaamidFormatter.formatAutomatic("HELLO WORLD\\nhello world"));
+        assertEquals("HELLO WORLD\nHello World",
+                HaamidFormatter.formatAutomatic("HELLO WORLD\nhello world"));
     }
 }
