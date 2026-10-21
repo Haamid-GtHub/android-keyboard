@@ -2852,6 +2852,28 @@ public final class InputLogic {
      * @param commitType the type of the commit, as one of LastComposedWord.COMMIT_TYPE_*
      * @param separatorString the separator that's causing the commit, or NOT_A_SEPARATOR if none.
      */
+    private boolean shouldApplyHaamidAutomaticFormatting() {
+        if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
+            return false;
+        }
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo == null) {
+            return false;
+        }
+
+        final int inputClass = editorInfo.inputType & InputType.TYPE_MASK_CLASS;
+        if (inputClass != InputType.TYPE_CLASS_TEXT) {
+            return false;
+        }
+
+        final int variation = editorInfo.inputType & InputType.TYPE_MASK_VARIATION;
+        return variation != InputType.TYPE_TEXT_VARIATION_PASSWORD
+                && variation != InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                && variation != InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+                && variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                && variation != InputType.TYPE_TEXT_VARIATION_URI;
+    }
+
     private void commitChosenWord(final SettingsValues settingsValues, final String chosenWord,
             final int commitType, final String separatorString, final int importance) {
         long startTimeMillis = 0;
@@ -2860,9 +2882,22 @@ public final class InputLogic {
             Log.d(TAG, "commitChosenWord() : [" + chosenWord + "]");
         }
         final SuggestedWords suggestedWords = mSuggestedWords;
+        // Apply Title Case only at the existing word-commit boundary. This avoids replacing
+        // the editor contents on every keystroke, which can duplicate text or disturb cursors.
+        final String typedWordForTracking = mWordComposer.getTypedWord();
+        String wordToCommit = chosenWord;
+        boolean automaticFormattingChangedText = false;
+        if (shouldApplyHaamidAutomaticFormatting()) {
+            final String formatted = HaamidFormatter.formatAutomatic(chosenWord);
+            if (!formatted.equals(chosenWord)) {
+                wordToCommit = formatted;
+                automaticFormattingChangedText = true;
+            }
+        }
+
         // TODO: Locale should be determined based on context and the text given.
         final Locale locale = getDictionaryFacilitatorLocale();
-        final CharSequence chosenWordWithSuggestions = chosenWord;
+        final CharSequence chosenWordWithSuggestions = wordToCommit;
         // b/21926256
         //      SuggestionSpanUtils.getTextWithSuggestionSpan(mLatinIME, chosenWord,
         //                suggestedWords, locale);
@@ -2904,8 +2939,12 @@ public final class InputLogic {
         // what user typed. Note: currently this is done much later in
         // LastComposedWord#didCommitTypedWord by string equality of the remembered
         // strings.
+        final String typedWordForCommitTracking =
+                automaticFormattingChangedText && chosenWord.equals(typedWordForTracking)
+                        ? wordToCommit : typedWordForTracking;
         mLastComposedWord = mWordComposer.commitWord(commitType,
-                chosenWordWithSuggestions, separatorString, ngramContext);
+                chosenWordWithSuggestions, separatorString, ngramContext,
+                typedWordForCommitTracking);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
