@@ -36,8 +36,8 @@ val PasteAction = Action(
     icon = R.drawable.clipboard,
     name = R.string.action_paste_title,
     simplePressImpl = { manager, _ ->
-        // Leave pasted content unchanged. Automatic formatting is applied at supported
-        // editor completion actions or when built-in FUTO voice input finishes.
+        // Leave pasted content unchanged. Automatic formatting is applied at safe word
+        // commit boundaries during typing and when built-in FUTO voice input finishes.
         manager.pasteFromClipboard()
     },
     windowImpl = null,
