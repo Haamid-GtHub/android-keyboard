@@ -2500,7 +2500,7 @@ public final class InputLogic {
             return;
         }
 
-        final String formattedText = HaamidFormatter.format(originalText);
+        final String formattedText = HaamidFormatter.formatAutomatic(originalText);
         if (formattedText.equals(originalText)) {
             return;
         }
