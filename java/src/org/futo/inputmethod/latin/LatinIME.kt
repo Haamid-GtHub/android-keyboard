@@ -9,9 +9,6 @@ import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -212,15 +209,6 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     private var activeThemeOption: ThemeOption? = null
     private val activeColorScheme = mutableStateOf(DefaultDarkScheme.obtainColors(this))
     private var pendingRecreateKeyboard: Boolean = false
-
-    // Apply Haamid Title Case to completed words after a short pause, without
-    // rewriting the active composing word or interfering with voice input.
-    private val haamidFormattingHandler = Handler(Looper.getMainLooper())
-    private var pendingHaamidFormatting: Runnable? = null
-    private var haamidFormattingGeneration = 0
-    private var isApplyingHaamidFormatting = false
-
-    // Title Case is applied only at a supported completion action, never on a typing pause.
 
     val colorScheme get() = activeColorScheme.value
     val keyboardColor get() = colorScheme.keyboardSurface.let { fallback ->
@@ -705,111 +693,12 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
             candidatesEnd
         )
 
-        scheduleHaamidManualFormatting(
-            oldSelEnd,
-            newSelStart,
-            newSelEnd,
-            candidatesStart,
-            candidatesEnd
-        )
     }
 
-    private fun scheduleHaamidManualFormatting(
-        oldSelEnd: Int,
-        newSelStart: Int,
-        newSelEnd: Int,
-        composingStart: Int,
-        composingEnd: Int
-    ) {
-        pendingHaamidFormatting?.let { haamidFormattingHandler.removeCallbacks(it) }
-        pendingHaamidFormatting = null
-        haamidFormattingGeneration += 1
-        val generation = haamidFormattingGeneration
-
-        if (isApplyingHaamidFormatting ||
-            !HaamidFormattingSettings.isAutomaticFormattingEnabled() ||
-            newSelStart != newSelEnd ||
-            newSelEnd <= oldSelEnd ||
-            (composingStart >= 0 && composingEnd >= 0 && composingStart != composingEnd) ||
-            !isHaamidFormattingSupportedField()
-        ) {
-            return
-        }
-
-        // Manual typing has no explicit "finished" callback like voice input. Debounce edits
-        // and format the whole text before the cursor, so the formatter's whole-text uppercase
-        // rule and acronym behavior remain intact instead of treating each word independently.
-        val task = Runnable {
-            if (generation != haamidFormattingGeneration ||
-                !HaamidFormattingSettings.isAutomaticFormattingEnabled() ||
-                !isHaamidFormattingSupportedField()
-            ) {
-                return@Runnable
-            }
-
-            val connection = currentInputConnection ?: return@Runnable
-            // Only format when the cursor is at the end. Never replace text around a cursor
-            // in the middle of a message or overwrite text that is after the cursor.
-            val afterCursor = connection.getTextAfterCursor(1, 0) ?: return@Runnable
-            if (afterCursor.isNotEmpty()) return@Runnable
-
-            val originalText = connection.getTextBeforeCursor(4096, 0)?.toString()
-                ?: return@Runnable
-            if (originalText.isEmpty() || originalText.length >= 4096) return@Runnable
-
-            // Avoid rewriting a field containing an email address or URL.
-            val lowerText = originalText.lowercase()
-            if (originalText.contains('@') ||
-                lowerText.contains("://") ||
-                lowerText.contains("www.") ||
-                lowerText.contains("mailto:")
-            ) {
-                return@Runnable
-            }
-
-            val formattedText = HaamidFormatter.format(originalText)
-            if (formattedText == originalText) return@Runnable
-
-            // Replace the text once, only after a pause, and restore the original if the editor
-            // rejects the replacement. The active composing word was excluded above.
-            isApplyingHaamidFormatting = true
-            try {
-                if (!connection.deleteSurroundingText(originalText.length, 0)) {
-                    return@Runnable
-                }
-                if (!connection.commitText(formattedText, 1)) {
-                    connection.commitText(originalText, 1)
-                }
-            } finally {
-                isApplyingHaamidFormatting = false
-            }
-        }
-
-        pendingHaamidFormatting = task
-        haamidFormattingHandler.postDelayed(task, 1200L)
-    }
-
-    private fun isHaamidFormattingSupportedField(): Boolean {
-        val inputType = currentInputEditorInfo?.inputType ?: return false
-        val inputClass = inputType and InputType.TYPE_MASK_CLASS
-        val variation = inputType and InputType.TYPE_MASK_VARIATION
-
-        if (inputClass == InputType.TYPE_CLASS_NUMBER ||
-            inputClass == InputType.TYPE_CLASS_PHONE
-        ) {
-            return false
-        }
-
-        if (inputClass == InputType.TYPE_CLASS_TEXT) {
-            return variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS &&
-                variation != InputType.TYPE_TEXT_VARIATION_URI &&
-                variation != InputType.TYPE_TEXT_VARIATION_PASSWORD &&
-                variation != InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD &&
-                variation != InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
-        }
-
-        return true
-    }
+    // Manual typing is intentionally not rewritten after an idle pause. Whole-field replacement
+    // can disrupt editor state, autocorrect, cursor position, and external voice input. Built-in
+    // FUTO voice output is formatted at its explicit completion callback; other input can use the
+    // manual Title Case action or Android's PROCESS_TEXT selection action.
 
     override fun onExtractedTextClicked() {
         latinIMELegacy.onExtractedTextClicked()
