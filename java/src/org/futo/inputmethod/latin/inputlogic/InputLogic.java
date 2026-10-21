@@ -2810,9 +2810,13 @@ public final class InputLogic {
         String wordToCommit = chosenWord;
         boolean automaticFormattingChangedText = false;
         // Preserve deliberate edits made after moving the cursor into existing text.
-        // Suggestions are also completed words: format them at this same commit boundary,
-        // while the formatter itself preserves acronyms and intentionally mixed-case words.
-        final boolean skipHaamidFormatting = mHaamidSkipNextAutomaticFormatting;
+        // An explicitly picked suggestion is a completed-word action and must still be
+        // formatted, even if a cursor-edit skip flag was left over from an earlier selection.
+        // The formatter itself preserves acronyms and intentionally mixed-case words.
+        final boolean isManualSuggestionPick =
+                commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
+        final boolean skipHaamidFormatting =
+                mHaamidSkipNextAutomaticFormatting && !isManualSuggestionPick;
         mHaamidSkipNextAutomaticFormatting = false;
         if (!skipHaamidFormatting && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidFormatter.formatAutomatic(chosenWord);
