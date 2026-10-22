@@ -267,7 +267,12 @@ private class VoiceInputActionWindow(
 
         manager.getLifecycleScope().launch(Dispatchers.Main) {
             val sanitized = ModelOutputSanitizer.sanitize(result, inputTransaction.textContext)
-            val finalText = if (org.futo.inputmethod.latin.HaamidFormattingSettings.isAutomaticFormattingEnabled()) org.futo.inputmethod.latin.HaamidFormatter.formatAutomatic(sanitized) else sanitized
+            val finalText = if (org.futo.inputmethod.latin.HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
+                val formatted = org.futo.inputmethod.latin.HaamidFormatter.formatAutomatic(sanitized)
+                org.futo.inputmethod.latin.HaamidApostropheOverrides.apply(sanitized, formatted)
+            } else {
+                sanitized
+            }
             inputTransaction.commit(finalText)
             manager.announce(finalText)
             manager.closeActionWindow()
