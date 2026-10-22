@@ -65,6 +65,16 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleStableDebug --no-daemon --stacktrace
 
+      - name: Run Android regression tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
+
       - name: Prepare APK
         shell: bash
         run: |
