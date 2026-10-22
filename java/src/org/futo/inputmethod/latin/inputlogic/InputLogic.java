@@ -1519,6 +1519,12 @@ public final class InputLogic {
             }
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
+            // A normal Backspace on a formatter-adjusted committed word should edit
+            // the text in place, not trigger a special whole-word case undo.
+            if (mLastComposedWord.isHaamidFormattingApplied()) {
+                mHaamidSkipNextAutomaticFormatting = true;
+                mHaamidWordRestoredByUndo = null;
+            }
             if (mLastComposedWord.canRevertCommit()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
                     && !mLastComposedWord.isHaamidFormattingApplied()) {
