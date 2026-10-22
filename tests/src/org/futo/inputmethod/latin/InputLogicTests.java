@@ -129,7 +129,7 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
-    public void testManualSuggestionBackspaceThenEditPreservesEditedWord() {
+    public void testManualSuggestionBackspaceRestoresOriginalTypedWordAndCase() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
         try {
@@ -139,12 +139,7 @@ public class InputLogicTests extends InputTestsBase {
                     mEditText.getText().toString());
 
             type(Constants.CODE_DELETE);
-            assertEquals("Backspace edits the chosen word normally", "Thi",
-                    mEditText.getText().toString());
-
-            type("x");
-            type(Constants.CODE_SPACE);
-            assertEquals("edited chosen suggestion keeps user's casing", "Thix ",
+            assertEquals("Backspace restores the original typed word and case", "tgis",
                     mEditText.getText().toString());
         } finally {
             HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
