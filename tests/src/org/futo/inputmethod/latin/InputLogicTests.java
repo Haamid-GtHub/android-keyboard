@@ -146,6 +146,26 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testBackspaceDeletesOneCharacterWhileTypingApostropheWords() {
+        final String[] words = new String[] { "can't", "don't", "I'm", "Ma'am" };
+        for (final String word : words) {
+            mEditText.setText("");
+            type(word);
+            final String typedWord = mEditText.getText().toString();
+            assertEquals("word is entered before Backspace", word, typedWord);
+
+            type(Constants.CODE_DELETE);
+            assertEquals("Backspace removes only one character from " + word,
+                    typedWord.substring(0, typedWord.length() - 1),
+                    mEditText.getText().toString());
+
+            type(Constants.CODE_DELETE);
+            assertEquals("second Backspace removes only one more character from " + word,
+                    typedWord.substring(0, typedWord.length() - 2),
+                    mEditText.getText().toString());
+        }
+    }
+
     public void testAutomaticTitleCaseBackspaceDeletesOneCharacterFromApostropheWords() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
