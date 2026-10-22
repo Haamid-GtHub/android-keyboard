@@ -2898,6 +2898,16 @@ public final class InputLogic {
         // the editor contents on every keystroke, which can duplicate text or disturb cursors.
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
+        // Number-leading tokens (for example, "2nd") are deliberately exempt from Haamid
+        // Title Case. If the keyboard's suggestion casing changes such a token without
+        // changing its letters, keep the user's exact typed casing instead of committing
+        // a spurious form such as "2Nd". HaamidFormatter itself remains unchanged.
+        if (!typedWordForTracking.isEmpty() && !chosenWord.isEmpty()
+                && Character.isDigit(typedWordForTracking.charAt(0))
+                && Character.isDigit(chosenWord.charAt(0))
+                && typedWordForTracking.equalsIgnoreCase(chosenWord)) {
+            wordToCommit = typedWordForTracking;
+        }
         boolean haamidFormattingChanged = false;
         // Preserve deliberate edits made after moving the cursor into existing text.
         // An explicitly picked suggestion is a completed-word action and must still be
