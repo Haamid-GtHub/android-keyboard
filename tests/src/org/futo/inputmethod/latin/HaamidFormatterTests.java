@@ -20,6 +20,13 @@ public final class HaamidFormatterTests extends AndroidTestCase {
                 HaamidFormatter.format("don't must've rock'n'roll"));
     }
 
+    public void testPreservesBothMaamSpellings() {
+        assertEquals("Ma'am", HaamidFormatter.format("Ma'am"));
+        assertEquals("Ma'Am", HaamidFormatter.format("Ma'Am"));
+        assertEquals("Ma'am", HaamidFormatter.formatAutomatic("Ma'am"));
+        assertEquals("Ma'Am", HaamidFormatter.formatAutomatic("Ma'Am"));
+    }
+
     public void testNormalizesEntirelyUppercaseInput() {
         assertEquals("Hello World", HaamidFormatter.format("HELLO WORLD"));
     }
