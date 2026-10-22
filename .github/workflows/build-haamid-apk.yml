@@ -2,9 +2,6 @@ name: Build Haamid Keyboard APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - haamid-strict-title-case
 
 permissions:
   contents: write
@@ -16,6 +13,7 @@ jobs:
       - name: Check Out Repository And Submodules
         uses: actions/checkout@v4
         with:
+          ref: haamid-strict-title-case
           submodules: recursive
           fetch-depth: 0
 
@@ -28,6 +26,9 @@ jobs:
       - name: Set Up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Verify Shared Signing Key Is Present
+        run: test -f java/shared.keystore
+
       - name: Build Stable Release APK
         env:
           VERSION_CODE: ${{ github.run_number }}
@@ -35,11 +36,25 @@ jobs:
           BRANCH_NAME: haamid-strict-title-case
         run: ./gradlew assembleStableRelease --stacktrace
 
+      - name: Verify Package Name And Signing Certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f -print -quit)"
+          if [ -z "$APK" ]; then
+            echo "::error::Stable release APK was not found."
+            exit 1
+          fi
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort | tail -n 1)"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.futo.inputmethod.latin'"
+          "$APKSIGNER" verify --print-certs "$APK"
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: haamid-keyboard-stable-release-apk
-          path: '**/build/outputs/apk/**/*.apk'
+          path: '**/build/outputs/apk/stable/release/*.apk'
           if-no-files-found: error
           retention-days: 14
 
@@ -48,13 +63,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION_CODE: ${{ github.run_number }}
         run: |
-          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f | head -n 1)"
           if [ -z "$APK" ]; then
-            echo "::error::Built APK could not be found."
+            echo "::error::Built stable release APK could not be found."
             exit 1
           fi
           cp "$APK" HaamidKeyboard.apk
-          TAG="haamid-stable-$VERSION_CODE"
+          TAG="haamid-stable-manual-$VERSION_CODE"
           gh release create "$TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard Stable $VERSION_CODE" \
-            --notes "Stable-flavor release APK for sideloading with Haamid's title-case formatter and manual Title Case action. This is a stable flavor build, not a Play Store-published or Play Store-signed app. Android may require the user to confirm installation; it does not silently update an installed app."
+            --title "Haamid Keyboard Stable Manual $VERSION_CODE" \
+            --notes "Stable-flavor APK built from branch haamid-strict-title-case. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore. Install over a previous Haamid build only if Android confirms the signing certificate matches."
