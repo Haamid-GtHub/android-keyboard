@@ -8,7 +8,7 @@ public final class HaamidFormatter {
 
     private static final Set<String> CONTRACTIONS =
             new HashSet<>(Arrays.asList(
-                    "s", "t", "m", "d", "ll", "re", "ve", "am"
+                    "s", "t", "m", "d", "ll", "re", "ve"
             ));
 
     private static final char CURLY = '\u2019';
@@ -116,6 +116,10 @@ public final class HaamidFormatter {
                 result.append(
                         formatWord(part, entireTextUppercase)
                 );
+            } else if ("am".equals(part) || "Am".equals(part)) {
+                // Ma'am and Ma'Am are both intentional spellings requested by the user.
+                // Preserve this suffix exactly as typed instead of forcing one casing.
+                result.append(apostrophe).append(part);
             } else if (CONTRACTIONS.contains(part.toLowerCase())) {
                 result.append(apostrophe).append(part.toLowerCase());
             } else {
