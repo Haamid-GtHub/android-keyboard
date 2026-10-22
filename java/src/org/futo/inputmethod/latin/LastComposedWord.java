@@ -86,8 +86,9 @@ public final class LastComposedWord {
     }
 
     /**
-     * Marks a case-only Haamid formatting change as undoable with the next Backspace.
-     * Unlike ordinary typed-word commits, this deliberately reactivates the commit record.
+     * Records that Haamid's automatic formatter changed the committed text.
+     * Keep the commit active so a real lexical auto-correction can still be reverted,
+     * while InputLogic can distinguish formatting-only case changes from auto-correction.
      */
     public void markHaamidFormattingApplied() {
         mHaamidFormattingApplied = true;
