@@ -86,8 +86,24 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
 
             if (baselineText == null) {
                 CharSequence before = event.getBeforeText();
-                if (before == null) return;
-                baselineText = before.toString();
+                if (before != null) {
+                    baselineText = before.toString();
+                } else {
+                    // Some Android/editor combinations omit beforeText. For a pure insertion,
+                    // reconstruct the prior value from the current text and event indices.
+                    // Do not guess when existing text was replaced or removed.
+                    CharSequence currentSequence = source.getText();
+                    int from = event.getFromIndex();
+                    int added = event.getAddedCount();
+                    if (currentSequence == null || event.getRemovedCount() != 0
+                            || added <= 0 || from < 0
+                            || from + added > currentSequence.length()) {
+                        return;
+                    }
+                    String currentValue = currentSequence.toString();
+                    baselineText = currentValue.substring(0, from)
+                            + currentValue.substring(from + added);
+                }
                 targetPackage = eventPackage;
             }
 
