@@ -75,6 +75,19 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testAutomaticTitleCasePreservesIntentionalNumberLeadingMixedCase() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("2Nd");
+            type(Constants.CODE_SPACE);
+            assertEquals("intentional mixed case in a number-leading token is preserved", "2Nd ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testAutomaticTitleCaseBackspaceThenEditPreservesEditedWord() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
