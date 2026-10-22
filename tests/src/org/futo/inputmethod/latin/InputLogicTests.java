@@ -129,7 +129,7 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
-    public void testManualSuggestionBackspaceRestoresOriginalTypedWordAndCase() {
+    public void testManualSuggestionBackspaceDeletesOneCharacterInsteadOfUndoingPick() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
         try {
@@ -139,8 +139,40 @@ public class InputLogicTests extends InputTestsBase {
                     mEditText.getText().toString());
 
             type(Constants.CODE_DELETE);
-            assertEquals("Backspace restores the original typed word and case", "tgis",
+            assertEquals("Backspace edits the manually chosen suggestion normally", "Thi",
                     mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
+    public void testAutomaticTitleCaseBackspaceDeletesOneCharacterFromApostropheWords() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        final String[] words = new String[] { "can't", "don't", "I'm", "Ma'am" };
+        try {
+            for (final String word : words) {
+                mEditText.setText("");
+                type(word);
+                type(Constants.CODE_SPACE);
+                final String formattedWord = mEditText.getText().toString().trim();
+                assertEquals("Title Case leaves one trailing separator", formattedWord + " ",
+                        mEditText.getText().toString());
+
+                type(Constants.CODE_DELETE);
+                assertEquals("first Backspace removes only the separator", formattedWord,
+                        mEditText.getText().toString());
+
+                type(Constants.CODE_DELETE);
+                assertEquals("second Backspace removes only the final character",
+                        formattedWord.substring(0, formattedWord.length() - 1),
+                        mEditText.getText().toString());
+
+                type(Constants.CODE_DELETE);
+                assertEquals("third Backspace removes only one more character",
+                        formattedWord.substring(0, formattedWord.length() - 2),
+                        mEditText.getText().toString());
+            }
         } finally {
             HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
         }
