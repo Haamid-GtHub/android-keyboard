@@ -384,6 +384,9 @@ class LatinIME : InputMethodServiceCompose(), LatinIMELegacy.SuggestionStripCont
     override fun onCreate() {
         super.onCreate()
 
+        // Load the persisted Title Case preference before keyboard and voice input use it.
+        HaamidFormattingSettings.initialize(this)
+
         UserBinaryDictionary.resetUserDictionariesRequiringRecreation()
 
         CanThrowIfDebug = isDirectBootUnlocked
