@@ -2930,7 +2930,13 @@ public final class InputLogic {
         // Consume this undo marker at the next completed-word boundary. If the word differs,
         // this commit is treated as the user's intentional edit and is not reformatted.
         mHaamidWordRestoredByUndo = null;
-        if (!skipHaamidFormatting && !hasIntentionalMixedCase(chosenWord)
+        // Number-leading tokens are exempt from automatic Title Case. Preserve the user's
+        // original casing (handled above when the suggestion is the same token) and do not
+        // let a dictionary suggestion turn "2nd" into "2Nd" when Space commits the word.
+        final boolean isNumberLeadingTypedToken = !typedWordForTracking.isEmpty()
+                && Character.isDigit(typedWordForTracking.charAt(0));
+        if (!skipHaamidFormatting && !isNumberLeadingTypedToken
+                && !hasIntentionalMixedCase(chosenWord)
                 && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidApostropheOverrides.apply(
                     chosenWord, HaamidFormatter.formatAutomatic(chosenWord));
