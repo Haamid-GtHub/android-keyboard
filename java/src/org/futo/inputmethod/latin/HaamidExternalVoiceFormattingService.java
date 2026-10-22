@@ -37,6 +37,7 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                 | AccessibilityEvent.TYPE_VIEW_CLICKED
+                | AccessibilityEvent.TYPE_VIEW_FOCUSED
                 | AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.notificationTimeout = 100;
@@ -49,33 +50,35 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null || event.getPackageName() == null) return;
         String eventPackage = event.getPackageName().toString();
-
         int eventType = event.getEventType();
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-                || eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            if (isGoogleVoicePackage(eventPackage)
-                    && (isGoogleVoiceWindowEvent(event, eventPackage)
-                        || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                        || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)) {
-                // Different Google speech builds expose different class names and event text.
-                // Arm on Google window changes as a fallback; the next editable text change in
-                // another app is still required before any text can be modified.
-                waitingForGoogleVoiceText = true;
-                baselineText = null;
-                expectedText = null;
-                targetPackage = null;
+
+        if (isGoogleVoicePackage(eventPackage)
+                && (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    || eventType == AccessibilityEvent.TYPE_VIEW_CLICKED
+                    || isGoogleVoiceWindowEvent(event, eventPackage))) {
+            // Keep the most recent target-field snapshot captured from focus/click/text events.
+            // Some Google speech versions do not expose the target field's focus change.
+            waitingForGoogleVoiceText = true;
+            expectedText = null;
+            if (baselineText == null || targetPackage == null) {
                 oldSelectionStart = -1;
                 oldSelectionEnd = -1;
-                handler.removeCallbacks(clearSession);
-                handler.postDelayed(clearSession, SESSION_TIMEOUT_MS);
             }
+            handler.removeCallbacks(clearSession);
+            handler.postDelayed(clearSession, SESSION_TIMEOUT_MS);
             return;
         }
 
-        if (event.getEventType() != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
-                || !waitingForGoogleVoiceText
-                || isGoogleVoicePackage(eventPackage)) {
+        if (isGoogleVoicePackage(eventPackage)) return;
+
+        boolean isTargetSnapshotEvent =
+                eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED
+                || eventType == AccessibilityEvent.TYPE_VIEW_CLICKED
+                || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                || eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED;
+        if (!isTargetSnapshotEvent) return;
+        if (waitingForGoogleVoiceText && eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             return;
         }
 
@@ -83,6 +86,17 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         if (source == null) return;
         try {
             if (!source.isEditable() || source.isPassword() || source.getText() == null) return;
+
+            if (!waitingForGoogleVoiceText) {
+                // Track the latest focused editable field and its current text. This provides a
+                // baseline even when the speech UI never emits a useful focus event of its own.
+                baselineText = source.getText().toString();
+                targetPackage = eventPackage;
+                expectedText = null;
+                oldSelectionStart = source.getTextSelectionStart();
+                oldSelectionEnd = source.getTextSelectionEnd();
+                return;
+            }
 
             if (baselineText == null) {
                 CharSequence before = event.getBeforeText();
