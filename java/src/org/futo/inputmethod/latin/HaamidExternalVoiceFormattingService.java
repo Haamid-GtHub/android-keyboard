@@ -101,30 +101,15 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
             }
 
             if (!waitingForGoogleVoiceText) {
-                // Fallback for Android/Google builds that emit no accessible Google voice event:
-                // recognize only a pure multi-character insertion. Normal per-key typing and
-                // replacement/composition updates are ignored. This also covers pasted text.
-                if (event.getAddedCount() < 2 || event.getRemovedCount() != 0) {
-                    baselineText = current;
-                    targetPackage = eventPackage;
-                    oldSelectionStart = source.getTextSelectionStart();
-                    oldSelectionEnd = source.getTextSelectionEnd();
-                    return;
-                }
-                CharSequence before = event.getBeforeText();
-                if (before != null) {
-                    baselineText = before.toString();
-                } else {
-                    int from = event.getFromIndex();
-                    int added = event.getAddedCount();
-                    if (added <= 0 || from < 0 || from + added > current.length()) return;
-                    baselineText = current.substring(0, from)
-                            + current.substring(from + added);
-                }
+                // Do not infer voice typing from a multi-character insertion: that would also
+                // trigger on paste or other app-driven edits. Only a recognized Google voice UI
+                // event may arm this service for automatic formatting.
+                baselineText = current;
                 targetPackage = eventPackage;
-                waitingForGoogleVoiceText = true;
-                handler.removeCallbacks(clearSession);
-                handler.postDelayed(clearSession, SESSION_TIMEOUT_MS);
+                expectedText = null;
+                oldSelectionStart = source.getTextSelectionStart();
+                oldSelectionEnd = source.getTextSelectionEnd();
+                return;
             } else if (baselineText == null) {
                 CharSequence before = event.getBeforeText();
                 if (before != null) {
