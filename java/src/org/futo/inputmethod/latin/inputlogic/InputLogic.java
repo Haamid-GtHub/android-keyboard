@@ -1516,6 +1516,10 @@ public final class InputLogic {
                 setComposingTextInternal(getTextWithUnderline(mWordComposer.getTypedWord()), 1);
             } else {
                 mConnection.commitText("", 1);
+                // If Backspace erased the whole composing word, the next word is new
+                // input and should not inherit this word's formatting-skip marker.
+                mHaamidSkipNextAutomaticFormatting = false;
+                mHaamidWordRestoredByUndo = null;
             }
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
@@ -1738,6 +1742,15 @@ public final class InputLogic {
             ) {
                 restartSuggestionsOnWordTouchedByCursor(inputTransaction.mSettingsValues, inputTransaction,
                         false /* forStartInput */, currentKeyboardScriptId);
+            }
+
+            // Do not carry the intentional-edit marker into a new word if Backspace
+            // removed the entire word (or selection) rather than editing within it.
+            if (mHaamidSkipNextAutomaticFormatting
+                    && !isHaamidWordCharacter(mConnection.getTextBeforeCursor(1, 0))
+                    && !isHaamidWordCharacter(mConnection.getTextAfterCursor(1, 0))) {
+                mHaamidSkipNextAutomaticFormatting = false;
+                mHaamidWordRestoredByUndo = null;
             }
         }
     }
