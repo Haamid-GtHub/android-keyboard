@@ -44,7 +44,7 @@ public class InputLogicTests extends InputTestsBase {
     }
 
 
-    public void testAutomaticTitleCaseDoesNotDuplicateAndBackspaceRestoresOriginalCase() {
+    public void testAutomaticTitleCaseDoesNotDuplicateAndBackspaceRemovesSeparatorNormally() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
         try {
@@ -54,56 +54,59 @@ public class InputLogicTests extends InputTestsBase {
             // Committing the composing word must replace it once, not append a duplicate.
             assertEquals("Hello ", mEditText.getText().toString());
 
-            // The first Backspace after formatting undoes only the case change.
+            // Title Case alone must not hijack Backspace into a special case-only undo.
             type(Constants.CODE_DELETE);
-            assertEquals("hello", mEditText.getText().toString());
+            assertEquals("Hello", mEditText.getText().toString());
         } finally {
             HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
         }
     }
 
-    public void testAutomaticTitleCaseUndoThenEditPreservesEditedWord() {
+    public void testAutomaticTitleCaseBackspaceThenEditPreservesEditedWord() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
         try {
             type("hello");
             type(Constants.CODE_SPACE);
-            assertEquals("formatted word before undo", "Hello ", mEditText.getText().toString());
+            assertEquals("formatted word before editing", "Hello ", mEditText.getText().toString());
 
+            // First Backspace removes the separator normally; the next edits the word.
             type(Constants.CODE_DELETE);
-            assertEquals("undo restores original word", "hello", mEditText.getText().toString());
+            assertEquals("normal Backspace removes separator", "Hello", mEditText.getText().toString());
+            type(Constants.CODE_DELETE);
+            assertEquals("normal Backspace edits the word", "Hell", mEditText.getText().toString());
 
-            // An intentional edit after undo must not be title-cased again at Space.
+            // The intentional edit must not be title-cased again at the next boundary.
             type("x");
             type(Constants.CODE_SPACE);
-            assertEquals("edited word keeps the user's casing", "hellox ",
+            assertEquals("edited word keeps the user's casing", "Hellx ",
                     mEditText.getText().toString());
         } finally {
             HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
         }
     }
 
-    public void testAutomaticTitleCaseUndoWithoutEditCanFormatAgain() {
+    public void testAutomaticTitleCaseBackspaceDoesNotForceCaseOnlyUndo() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
         try {
             type("hello");
             type(Constants.CODE_SPACE);
-            assertEquals("formatted word before undo", "Hello ", mEditText.getText().toString());
+            assertEquals("formatted word before Backspace", "Hello ", mEditText.getText().toString());
 
             type(Constants.CODE_DELETE);
-            assertEquals("undo restores original word", "hello", mEditText.getText().toString());
-
-            // If the user leaves the word untouched, Space should apply Title Case again.
-            type(Constants.CODE_SPACE);
-            assertEquals("unchanged word can be formatted again", "Hello ",
+            assertEquals("Backspace follows normal separator deletion", "Hello",
                     mEditText.getText().toString());
+
+            // Typing a separator again must not duplicate or corrupt the word.
+            type(Constants.CODE_SPACE);
+            assertEquals("word remains intact", "Hello ", mEditText.getText().toString());
         } finally {
             HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
         }
     }
 
-    public void testManualSuggestionUndoThenEditPreservesEditedWord() {
+    public void testManualSuggestionBackspaceThenEditPreservesEditedWord() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
         try {
@@ -113,12 +116,12 @@ public class InputLogicTests extends InputTestsBase {
                     mEditText.getText().toString());
 
             type(Constants.CODE_DELETE);
-            assertEquals("undo restores the chosen suggestion", "this",
+            assertEquals("Backspace edits the chosen word normally", "Thi",
                     mEditText.getText().toString());
 
             type("x");
             type(Constants.CODE_SPACE);
-            assertEquals("edited chosen suggestion keeps user's casing", "thisx ",
+            assertEquals("edited chosen suggestion keeps user's casing", "Thix ",
                     mEditText.getText().toString());
         } finally {
             HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
@@ -258,6 +261,23 @@ public class InputLogicTests extends InputTestsBase {
         type(Constants.CODE_DELETE);
         assertEquals("auto-correct with period then revert", EXPECTED_RESULT,
                 mEditText.getText().toString());
+    }
+
+    public void testAutoCorrectWithTitleCaseStillRestoresOriginalTypedWord() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("tgis ");
+            assertEquals("auto-correction is Title Cased once", "This ",
+                    mEditText.getText().toString());
+
+            sendUpdateForCursorMoveTo(mEditText.getText().length());
+            type(Constants.CODE_DELETE);
+            assertEquals("Backspace restores the original misspelled input", "tgis",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
     }
 
     public void testAutoCorrectWithSpaceThenRevert() {
