@@ -2808,7 +2808,6 @@ public final class InputLogic {
         // the editor contents on every keystroke, which can duplicate text or disturb cursors.
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
-        boolean automaticFormattingChangedText = false;
         // Preserve deliberate edits made after moving the cursor into existing text.
         // An explicitly picked suggestion is a completed-word action and must still be
         // formatted, even if a cursor-edit skip flag was left over from an earlier selection.
@@ -2822,7 +2821,6 @@ public final class InputLogic {
             final String formatted = HaamidFormatter.formatAutomatic(chosenWord);
             if (!formatted.equals(chosenWord)) {
                 wordToCommit = formatted;
-                automaticFormattingChangedText = true;
             }
         }
 
