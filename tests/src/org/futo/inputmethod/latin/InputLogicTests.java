@@ -106,6 +106,29 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testDeletingEntireFormattedWordDoesNotSuppressNextWord() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("a");
+            type(Constants.CODE_SPACE);
+            assertEquals("single-letter word is formatted", "A ",
+                    mEditText.getText().toString());
+
+            type(Constants.CODE_DELETE);
+            type(Constants.CODE_DELETE);
+            assertEquals("formatted word can be deleted normally", "",
+                    mEditText.getText().toString());
+
+            type("hello");
+            type(Constants.CODE_SPACE);
+            assertEquals("new word still receives automatic Title Case", "Hello ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testManualSuggestionBackspaceThenEditPreservesEditedWord() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
