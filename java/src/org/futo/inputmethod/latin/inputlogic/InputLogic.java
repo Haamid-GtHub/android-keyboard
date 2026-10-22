@@ -1535,6 +1535,7 @@ public final class InputLogic {
                     && !mLastComposedWord.mTypedWord.equalsIgnoreCase(
                             mLastComposedWord.mCommittedWord.toString());
             if (mLastComposedWord.canRevertCommit()
+                    && !mLastComposedWord.isManualSuggestionPick()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
                     && (!mLastComposedWord.isHaamidFormattingApplied()
                             || isLexicalAutoCorrection)) {
@@ -2980,6 +2981,9 @@ public final class InputLogic {
         mLastComposedWord = mWordComposer.commitWord(commitType,
                 chosenWordWithSuggestions, separatorString, ngramContext,
                 typedWordForCommitTracking);
+        if (commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
+            mLastComposedWord.markManualSuggestionPick();
+        }
         if (haamidFormattingChanged) {
             // Keep the original typed word and make this one commit undoable. The end-of-event
             // cleanup must not deactivate it before an immediate Backspace can restore the input.
