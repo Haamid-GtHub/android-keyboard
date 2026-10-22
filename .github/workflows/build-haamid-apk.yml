@@ -27,7 +27,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Verify Shared Signing Key Is Present
-        run: test -f java/shared.keystore
+        run: test -f java/shared.keystore && test ! -f keystore.properties
 
       - name: Set Build Version
         shell: bash
@@ -36,6 +36,7 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
           echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
+          echo "BUILD_TAG=haamid-stable-manual-$VERSION_CODE" >> "$GITHUB_ENV"
 
       - name: Build Stable Release APK
         run: ./gradlew assembleStableRelease --stacktrace
@@ -65,7 +66,6 @@ jobs:
       - name: Publish Installable APK Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION_CODE: ${{ github.run_number }}
         run: |
           APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f | head -n 1)"
           if [ -z "$APK" ]; then
@@ -73,7 +73,7 @@ jobs:
             exit 1
           fi
           cp "$APK" HaamidKeyboard.apk
-          TAG="haamid-stable-manual-$VERSION_CODE"
+          TAG="$BUILD_TAG"
           gh release create "$TAG" HaamidKeyboard.apk \
             --title "Haamid Keyboard Stable Manual $VERSION_CODE" \
             --notes "Stable-flavor APK built from branch haamid-strict-title-case. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore. Install over a previous Haamid build only if Android confirms the signing certificate matches."
