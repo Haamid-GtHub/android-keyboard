@@ -2888,11 +2888,12 @@ public final class InputLogic {
         // what user typed. Note: currently this is done much later in
         // LastComposedWord#didCommitTypedWord by string equality of the remembered
         // strings.
-        // Keep the user's original input for the existing Backspace undo/revert path.
-        // If automatic Title Case changed the committed word, Backspace can restore what
-        // the user typed; choosing a suggestion and pressing Space will then format that
-        // newly chosen word at the next normal commit boundary.
-        final String typedWordForCommitTracking = typedWordForTracking;
+        // For an ordinary typed word, preserve the original input for Backspace undo.
+        // If the user explicitly chose a suggestion and Title Case then changed its casing,
+        // undo must restore that exact suggestion, not the earlier text that was typed.
+        final String typedWordForCommitTracking =
+                haamidFormattingChanged && isManualSuggestionPick
+                        ? chosenWord : typedWordForTracking;
         mLastComposedWord = mWordComposer.commitWord(commitType,
                 chosenWordWithSuggestions, separatorString, ngramContext,
                 typedWordForCommitTracking);
