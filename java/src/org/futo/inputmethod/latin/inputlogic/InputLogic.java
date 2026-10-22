@@ -134,6 +134,9 @@ public final class InputLogic {
     private boolean mIsAutoCorrectionIndicatorOn;
     // Preserve deliberate edits when the user moves the cursor into existing text.
     private boolean mHaamidSkipNextAutomaticFormatting;
+    // The exact word restored by Backspace after automatic Title Case; used to distinguish
+    // an unchanged word (which may be formatted again) from a deliberate edit.
+    private String mHaamidWordRestoredByUndo;
     // Set only when automatic Title Case changed a word during the current input event.
     private boolean mHaamidFormattingCommitCreatedThisEvent;
     private long mDoubleSpacePeriodCountdownStart;
@@ -1504,7 +1507,13 @@ public final class InputLogic {
                     && (inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
                             || mLastComposedWord.isHaamidFormattingApplied())) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
+                final boolean wasHaamidFormattingApplied =
+                        mLastComposedWord.isHaamidFormattingApplied();
                 revertCommit(inputTransaction, inputTransaction.mSettingsValues);
+                if (wasHaamidFormattingApplied) {
+                    mHaamidWordRestoredByUndo = lastComposedWord != null
+                            ? lastComposedWord.toString() : "";
+                }
                 StatsUtils.onRevertAutoCorrect(mImeHelper.getContext(), lastComposedWord);
                 StatsUtils.onWordCommitUserTyped(lastComposedWord, mWordComposer.isBatchMode());
                 // Restart suggestions when backspacing into a reverted word. This is required for
@@ -2832,9 +2841,16 @@ public final class InputLogic {
         // The formatter itself preserves acronyms and intentionally mixed-case words.
         final boolean isManualSuggestionPick =
                 commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
-        final boolean skipHaamidFormatting =
-                mHaamidSkipNextAutomaticFormatting && !isManualSuggestionPick;
+        final boolean wordChangedAfterHaamidUndo = mHaamidWordRestoredByUndo != null
+                && (!mHaamidWordRestoredByUndo.equals(typedWordForTracking)
+                        || !mHaamidWordRestoredByUndo.equals(chosenWord));
+        final boolean skipHaamidFormatting = wordChangedAfterHaamidUndo
+                || (mHaamidSkipNextAutomaticFormatting
+                        && (!isManualSuggestionPick || mHaamidWordRestoredByUndo != null));
         mHaamidSkipNextAutomaticFormatting = false;
+        // Consume this undo marker at the next completed-word boundary. If the word differs,
+        // this commit is treated as the user's intentional edit and is not reformatted.
+        mHaamidWordRestoredByUndo = null;
         if (!skipHaamidFormatting && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidApostropheOverrides.apply(
                     chosenWord, HaamidFormatter.formatAutomatic(chosenWord));
