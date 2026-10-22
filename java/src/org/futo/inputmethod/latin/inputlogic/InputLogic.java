@@ -1525,9 +1525,15 @@ public final class InputLogic {
                 mHaamidSkipNextAutomaticFormatting = true;
                 mHaamidWordRestoredByUndo = null;
             }
+            final boolean isLexicalAutoCorrection =
+                    mLastComposedWord.mTypedWord != null
+                    && mLastComposedWord.mCommittedWord != null
+                    && !mLastComposedWord.mTypedWord.equalsIgnoreCase(
+                            mLastComposedWord.mCommittedWord.toString());
             if (mLastComposedWord.canRevertCommit()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
-                    && !mLastComposedWord.isHaamidFormattingApplied()) {
+                    && (!mLastComposedWord.isHaamidFormattingApplied()
+                            || isLexicalAutoCorrection)) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
                 final boolean wasHaamidFormattingApplied =
                         mLastComposedWord.isHaamidFormattingApplied();
