@@ -2,6 +2,9 @@ name: Haamid Stable APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - haamid-strict-title-case
 
 permissions:
   contents: write
@@ -65,7 +68,7 @@ jobs:
       - name: Run Android regression tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: 35
           target: default
           arch: x86_64
           profile: pixel_2
