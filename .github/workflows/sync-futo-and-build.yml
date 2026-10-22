@@ -62,7 +62,7 @@ jobs:
 
       - name: Verify shared signing key exists
         if: steps.sync.outputs.changed == 'true'
-        run: test -f java/shared.keystore
+        run: test -f java/shared.keystore && test ! -f keystore.properties
 
       - name: Set up Java
         if: steps.sync.outputs.changed == 'true'
