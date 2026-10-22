@@ -146,6 +146,19 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testAutomaticTitleCasePreservesIntentionalMixedCaseContraction() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("can'T");
+            type(Constants.CODE_SPACE);
+            assertEquals("intentional mixed-case contraction is preserved", "can'T ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testTypeWord() {
         final String WORD_TO_TYPE = "abcd";
         type(WORD_TO_TYPE);
