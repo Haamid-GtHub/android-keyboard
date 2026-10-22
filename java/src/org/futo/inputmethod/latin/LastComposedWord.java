@@ -56,6 +56,8 @@ public final class LastComposedWord {
             new InputPointers(DecoderSpecificConstants.DICTIONARY_MAX_WORD_LENGTH);
 
     private boolean mActive;
+    // True only when Haamid's automatic formatter changed the committed word's casing.
+    private boolean mHaamidFormattingApplied;
 
     public static final LastComposedWord NOT_A_COMPOSED_WORD =
             new LastComposedWord(new ArrayList<Event>(), null, "", "",
@@ -81,6 +83,19 @@ public final class LastComposedWord {
 
     public void deactivate() {
         mActive = false;
+    }
+
+    /**
+     * Marks a case-only Haamid formatting change as undoable with the next Backspace.
+     * Unlike ordinary typed-word commits, this deliberately reactivates the commit record.
+     */
+    public void markHaamidFormattingApplied() {
+        mHaamidFormattingApplied = true;
+        mActive = true;
+    }
+
+    public boolean isHaamidFormattingApplied() {
+        return mHaamidFormattingApplied;
     }
 
     public boolean canRevertCommit() {
