@@ -29,11 +29,15 @@ jobs:
       - name: Verify Shared Signing Key Is Present
         run: test -f java/shared.keystore
 
+      - name: Set Build Version
+        shell: bash
+        run: |
+          VERSION_CODE="$(date +%s)"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
+
       - name: Build Stable Release APK
-        env:
-          VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: 0.0.${{ github.run_number }}
-          BRANCH_NAME: haamid-strict-title-case
         run: ./gradlew assembleStableRelease --stacktrace
 
       - name: Verify Package Name And Signing Certificate
