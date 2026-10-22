@@ -61,8 +61,12 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
                     || isGoogleVoiceWindowEvent(event, eventPackage))) {
             // Preserve the last editable-field snapshot: Google often exposes its speech UI
             // separately from the app whose text is being edited.
-            waitingForGoogleVoiceText = true;
-            expectedText = null;
+            if (!waitingForGoogleVoiceText) {
+                waitingForGoogleVoiceText = true;
+                expectedText = null;
+            }
+            // Repeated speech-window events must not cancel a text-change debounce that is
+            // already waiting to format a recognized result.
             handler.removeCallbacks(clearSession);
             handler.postDelayed(clearSession, SESSION_TIMEOUT_MS);
             return;
