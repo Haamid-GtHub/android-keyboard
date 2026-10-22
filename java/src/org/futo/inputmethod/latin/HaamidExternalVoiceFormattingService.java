@@ -12,8 +12,9 @@ import java.util.List;
 
 /**
  * Optional accessibility bridge for text committed by external speech IMEs such as Google Voice Typing.
- * It only arms after a Google voice/search window appears, and only changes text after a subsequent
- * editable-field text-change event. It formats only the changed region, not the whole existing field.
+ * It arms when accessibility reports a Google voice/search UI event, then watches for a subsequent
+ * editable-field text change. Google versions vary in which window events they expose, so this
+ * intentionally accepts more than one event type. It formats only the changed region.
  */
 public final class HaamidExternalVoiceFormattingService extends AccessibilityService {
     private static final long DEBOUNCE_MS = 850L;
@@ -34,6 +35,8 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         super.onServiceConnected();
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                | AccessibilityEvent.TYPE_VIEW_CLICKED
                 | AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.notificationTimeout = 100;
@@ -47,8 +50,17 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         if (event == null || event.getPackageName() == null) return;
         String eventPackage = event.getPackageName().toString();
 
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (isGoogleVoiceWindowEvent(event, eventPackage)) {
+        int eventType = event.getEventType();
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                || eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            if (isGoogleVoicePackage(eventPackage)
+                    && (isGoogleVoiceWindowEvent(event, eventPackage)
+                        || eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                        || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)) {
+                // Different Google speech builds expose different class names and event text.
+                // Arm on Google window changes as a fallback; the next editable text change in
+                // another app is still required before any text can be modified.
                 waitingForGoogleVoiceText = true;
                 baselineText = null;
                 expectedText = null;
