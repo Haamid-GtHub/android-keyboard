@@ -2841,6 +2841,28 @@ public final class InputLogic {
      * @param commitType the type of the commit, as one of LastComposedWord.COMMIT_TYPE_*
      * @param separatorString the separator that's causing the commit, or NOT_A_SEPARATOR if none.
      */
+    /**
+     * Preserve mixed-case words exactly as the user entered them. The formatter processes
+     * apostrophe-separated parts independently, so this guard is needed for intentional forms
+     * such as "can'T" to avoid changing them to "Can'T" at the word-commit boundary.
+     */
+    private boolean hasIntentionalMixedCase(final String word) {
+        boolean hasUppercase = false;
+        boolean hasLowercase = false;
+        for (int i = 0; i < word.length(); i++) {
+            final char ch = word.charAt(i);
+            if (Character.isUpperCase(ch)) {
+                hasUppercase = true;
+            } else if (Character.isLowerCase(ch)) {
+                hasLowercase = true;
+            }
+            if (hasUppercase && hasLowercase) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean shouldApplyHaamidAutomaticFormatting() {
         if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
             return false;
@@ -2897,7 +2919,8 @@ public final class InputLogic {
         // Consume this undo marker at the next completed-word boundary. If the word differs,
         // this commit is treated as the user's intentional edit and is not reformatted.
         mHaamidWordRestoredByUndo = null;
-        if (!skipHaamidFormatting && shouldApplyHaamidAutomaticFormatting()) {
+        if (!skipHaamidFormatting && !hasIntentionalMixedCase(chosenWord)
+                && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidApostropheOverrides.apply(
                     chosenWord, HaamidFormatter.formatAutomatic(chosenWord));
             if (!formatted.equals(chosenWord)) {
