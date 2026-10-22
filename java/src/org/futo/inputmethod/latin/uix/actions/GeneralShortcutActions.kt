@@ -60,7 +60,8 @@ val HaamidFormatterAction = Action(
             val selected = connection.getSelectedText(0)?.toString()
             if (!selected.isNullOrEmpty()) {
                 // If text is selected, change only that selection.
-                val formatted = org.futo.inputmethod.latin.HaamidApostropheOverrides.apply(\n                    selected, org.futo.inputmethod.latin.HaamidFormatter.format(selected))
+                val formatted = org.futo.inputmethod.latin.HaamidApostropheOverrides.apply(
+                    selected, org.futo.inputmethod.latin.HaamidFormatter.format(selected))
                 if (formatted != selected) {
                     connection.beginBatchEdit()
                     try {
@@ -80,7 +81,8 @@ val HaamidFormatterAction = Action(
                     extracted.partialStartOffset != -1 || extracted.partialEndOffset != -1) {
                     manager.announce(context.getString(R.string.action_haamid_formatter_select_text))
                 } else {
-                    val formatted = org.futo.inputmethod.latin.HaamidApostropheOverrides.apply(\n                    original, org.futo.inputmethod.latin.HaamidFormatter.format(original))
+                    val formatted = org.futo.inputmethod.latin.HaamidApostropheOverrides.apply(
+                    original, org.futo.inputmethod.latin.HaamidFormatter.format(original))
                     if (formatted != original) {
                         connection.beginBatchEdit()
                         try {
