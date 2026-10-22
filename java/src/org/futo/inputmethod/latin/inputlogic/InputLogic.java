@@ -703,7 +703,14 @@ public final class InputLogic {
         }
 
         Event currentEvent = processedEvent;
+        boolean isFirstEventInTransaction = true;
         while (null != currentEvent) {
+            if (!isFirstEventInTransaction) {
+                // Only preserve the undo record when formatting happened in the final event
+                // handled by this transaction. A later event in a multi-event key must close it.
+                mHaamidFormattingCommitCreatedThisEvent = false;
+            }
+            isFirstEventInTransaction = false;
             if (currentEvent.isConsumed()) {
                 handleConsumedEvent(currentEvent, inputTransaction);
             } else if (currentEvent.isFunctionalKeyEvent()) {
