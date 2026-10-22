@@ -64,4 +64,26 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         assertEquals("HELLO WORLD\nHello World",
                 HaamidFormatter.formatAutomatic("HELLO WORLD\nhello world"));
     }
+
+    public void testHaamidFormattingCommitRemainsUndoableAfterDeactivation() {
+        LastComposedWord commit = new LastComposedWord(
+                new java.util.ArrayList<org.futo.inputmethod.event.Event>(),
+                null, "hello", "Hello", " ", null, WordComposer.CAPS_MODE_OFF);
+
+        commit.deactivate();
+        assertFalse(commit.canRevertCommit());
+
+        commit.markHaamidFormattingApplied();
+        assertTrue(commit.isHaamidFormattingApplied());
+        assertTrue(commit.canRevertCommit());
+    }
+
+    public void testHaamidFormattingUndoRequiresAnActualTextChange() {
+        LastComposedWord commit = new LastComposedWord(
+                new java.util.ArrayList<org.futo.inputmethod.event.Event>(),
+                null, "Hello", "Hello", " ", null, WordComposer.CAPS_MODE_OFF);
+
+        commit.markHaamidFormattingApplied();
+        assertFalse(commit.canRevertCommit());
+    }
 }
