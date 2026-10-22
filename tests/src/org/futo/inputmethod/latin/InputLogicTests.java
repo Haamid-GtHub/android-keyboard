@@ -43,6 +43,25 @@ public class InputLogicTests extends InputTestsBase {
         super.tearDown();
     }
 
+
+    public void testAutomaticTitleCaseDoesNotDuplicateAndBackspaceRestoresOriginalCase() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("hello");
+            type(Constants.CODE_SPACE);
+
+            // Committing the composing word must replace it once, not append a duplicate.
+            assertEquals("Hello ", mEditText.getText().toString());
+
+            // The first Backspace after formatting undoes only the case change.
+            type(Constants.CODE_DELETE);
+            assertEquals("hello", mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testTypeWord() {
         final String WORD_TO_TYPE = "abcd";
         type(WORD_TO_TYPE);
