@@ -134,6 +134,8 @@ public final class InputLogic {
     private boolean mIsAutoCorrectionIndicatorOn;
     // Preserve deliberate edits when the user moves the cursor into existing text.
     private boolean mHaamidSkipNextAutomaticFormatting;
+    // Set only when automatic Title Case changed a word during the current input event.
+    private boolean mHaamidFormattingCommitCreatedThisEvent;
     private long mDoubleSpacePeriodCountdownStart;
 
     // The word being corrected while the cursor is in the middle of the word.
@@ -656,6 +658,9 @@ public final class InputLogic {
     public InputTransaction onCodeInput(final SettingsValues settingsValues,
             @Nonnull final Event event, final int keyboardShiftMode,
             final int currentKeyboardScriptId) {
+        // Any previous out-of-band commit belongs to an earlier event. A new formatted commit
+        // below will set this flag again before the end-of-event deactivation check.
+        mHaamidFormattingCommitCreatedThisEvent = false;
         mWordBeingCorrectedByCursor = null;
 
         if(settingsValues.needsToLookupSuggestions()) {
@@ -718,8 +723,11 @@ public final class InputLogic {
         }
         if (!inputTransaction.didAutoCorrect() && processedEvent.mKeyCode != Constants.CODE_SHIFT
                 && processedEvent.mKeyCode != Constants.CODE_CAPSLOCK
-                && processedEvent.mKeyCode != Constants.CODE_SWITCH_ALPHA_SYMBOL)
+                && processedEvent.mKeyCode != Constants.CODE_SWITCH_ALPHA_SYMBOL
+                && !mHaamidFormattingCommitCreatedThisEvent) {
             mLastComposedWord.deactivate();
+        }
+        mHaamidFormattingCommitCreatedThisEvent = false;
         if (Constants.CODE_DELETE != processedEvent.mKeyCode) {
             mEnteredText = null;
         }
@@ -1486,7 +1494,8 @@ public final class InputLogic {
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
             if (mLastComposedWord.canRevertCommit()
-                    && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect) {
+                    && (inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
+                            || mLastComposedWord.isHaamidFormattingApplied())) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
                 revertCommit(inputTransaction, inputTransaction.mSettingsValues);
                 StatsUtils.onRevertAutoCorrect(mImeHelper.getContext(), lastComposedWord);
@@ -2809,6 +2818,7 @@ public final class InputLogic {
         // the editor contents on every keystroke, which can duplicate text or disturb cursors.
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
+        boolean haamidFormattingChanged = false;
         // Preserve deliberate edits made after moving the cursor into existing text.
         // An explicitly picked suggestion is a completed-word action and must still be
         // formatted, even if a cursor-edit skip flag was left over from an earlier selection.
@@ -2823,6 +2833,7 @@ public final class InputLogic {
                     chosenWord, HaamidFormatter.formatAutomatic(chosenWord));
             if (!formatted.equals(chosenWord)) {
                 wordToCommit = formatted;
+                haamidFormattingChanged = true;
             }
         }
 
@@ -2878,6 +2889,12 @@ public final class InputLogic {
         mLastComposedWord = mWordComposer.commitWord(commitType,
                 chosenWordWithSuggestions, separatorString, ngramContext,
                 typedWordForCommitTracking);
+        if (haamidFormattingChanged) {
+            // Keep the original typed word and make this one commit undoable. The end-of-event
+            // cleanup must not deactivate it before an immediate Backspace can restore the input.
+            mLastComposedWord.markHaamidFormattingApplied();
+            mHaamidFormattingCommitCreatedThisEvent = true;
+        }
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
