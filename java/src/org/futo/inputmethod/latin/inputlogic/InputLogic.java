@@ -2818,7 +2818,8 @@ public final class InputLogic {
                 mHaamidSkipNextAutomaticFormatting && !isManualSuggestionPick;
         mHaamidSkipNextAutomaticFormatting = false;
         if (!skipHaamidFormatting && shouldApplyHaamidAutomaticFormatting()) {
-            final String formatted = HaamidFormatter.formatAutomatic(chosenWord);
+            final String formatted = HaamidApostropheOverrides.apply(
+                    chosenWord, HaamidFormatter.formatAutomatic(chosenWord));
             if (!formatted.equals(chosenWord)) {
                 wordToCommit = formatted;
             }
