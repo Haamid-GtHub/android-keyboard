@@ -62,6 +62,69 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testAutomaticTitleCaseUndoThenEditPreservesEditedWord() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("hello");
+            type(Constants.CODE_SPACE);
+            assertEquals("formatted word before undo", "Hello ", mEditText.getText().toString());
+
+            type(Constants.CODE_DELETE);
+            assertEquals("undo restores original word", "hello", mEditText.getText().toString());
+
+            // An intentional edit after undo must not be title-cased again at Space.
+            type("x");
+            type(Constants.CODE_SPACE);
+            assertEquals("edited word keeps the user's casing", "hellox ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
+    public void testAutomaticTitleCaseUndoWithoutEditCanFormatAgain() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("hello");
+            type(Constants.CODE_SPACE);
+            assertEquals("formatted word before undo", "Hello ", mEditText.getText().toString());
+
+            type(Constants.CODE_DELETE);
+            assertEquals("undo restores original word", "hello", mEditText.getText().toString());
+
+            // If the user leaves the word untouched, Space should apply Title Case again.
+            type(Constants.CODE_SPACE);
+            assertEquals("unchanged word can be formatted again", "Hello ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
+    public void testManualSuggestionUndoThenEditPreservesEditedWord() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("tgis");
+            pickSuggestionManually("this");
+            assertEquals("chosen suggestion is title-cased", "This",
+                    mEditText.getText().toString());
+
+            type(Constants.CODE_DELETE);
+            assertEquals("undo restores the chosen suggestion", "this",
+                    mEditText.getText().toString());
+
+            type("x");
+            type(Constants.CODE_SPACE);
+            assertEquals("edited chosen suggestion keeps user's casing", "thisx ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testTypeWord() {
         final String WORD_TO_TYPE = "abcd";
         type(WORD_TO_TYPE);
