@@ -58,6 +58,8 @@ public final class LastComposedWord {
     private boolean mActive;
     // True only when Haamid's automatic formatter changed the committed word's casing.
     private boolean mHaamidFormattingApplied;
+    // A manually selected suggestion is a deliberate choice, not an auto-correction undo target.
+    private boolean mManualSuggestionPick;
 
     public static final LastComposedWord NOT_A_COMPOSED_WORD =
             new LastComposedWord(new ArrayList<Event>(), null, "", "",
@@ -97,6 +99,14 @@ public final class LastComposedWord {
 
     public boolean isHaamidFormattingApplied() {
         return mHaamidFormattingApplied;
+    }
+
+    public void markManualSuggestionPick() {
+        mManualSuggestionPick = true;
+    }
+
+    public boolean isManualSuggestionPick() {
+        return mManualSuggestionPick;
     }
 
     public boolean canRevertCommit() {
