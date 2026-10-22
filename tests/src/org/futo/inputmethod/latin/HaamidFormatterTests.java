@@ -20,11 +20,18 @@ public final class HaamidFormatterTests extends AndroidTestCase {
                 HaamidFormatter.format("don't must've rock'n'roll"));
     }
 
-    public void testPreservesBothMaamSpellings() {
-        assertEquals("Ma'am", HaamidFormatter.format("Ma'am"));
+    public void testMaamOverrideIsSeparateFromFormatter() {
+        assertEquals("Ma'Am", HaamidFormatter.format("ma'am"));
         assertEquals("Ma'Am", HaamidFormatter.format("Ma'Am"));
-        assertEquals("Ma'am", HaamidFormatter.formatAutomatic("Ma'am"));
-        assertEquals("Ma'Am", HaamidFormatter.formatAutomatic("Ma'Am"));
+        assertEquals("Ma'Am", HaamidFormatter.formatAutomatic("ma'am"));
+        assertEquals("Ma'am", HaamidApostropheOverrides.apply(
+                "ma'am", HaamidFormatter.formatAutomatic("ma'am")));
+        assertEquals("Ma'Am", HaamidApostropheOverrides.apply(
+                "Ma'Am", HaamidFormatter.formatAutomatic("Ma'Am")));
+    }
+
+    public void testOtherApostropheWordsKeepTitleCase() {
+        assertEquals("O'Clock Y'All", HaamidFormatter.format("o'clock y'all"));
     }
 
     public void testNormalizesEntirelyUppercaseInput() {
