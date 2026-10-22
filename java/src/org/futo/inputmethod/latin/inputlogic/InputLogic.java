@@ -1488,6 +1488,10 @@ public final class InputLogic {
                 && inputTransaction.mSettingsValues.mBackspaceModeHold == Settings.BACKSPACE_MODE_WORDS;
 
         if (mWordComposer.isComposingWord() && !mConnection.hasSelection()) {
+            // Backspace means the user is editing this word intentionally. Do not
+            // reapply automatic Title Case when the edited word is committed.
+            mHaamidSkipNextAutomaticFormatting = true;
+            mHaamidWordRestoredByUndo = null;
             if (mWordComposer.isBatchMode()) {
                 final String rejectedSuggestion = mWordComposer.getTypedWord();
                 mWordComposer.reset(true);
@@ -1516,8 +1520,8 @@ public final class InputLogic {
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
             if (mLastComposedWord.canRevertCommit()
-                    && (inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
-                            || mLastComposedWord.isHaamidFormattingApplied())) {
+                    && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
+                    && !mLastComposedWord.isHaamidFormattingApplied()) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
                 final boolean wasHaamidFormattingApplied =
                         mLastComposedWord.isHaamidFormattingApplied();
