@@ -424,7 +424,11 @@ public final class InputLogic {
         if(word.indexOf(' ') != -1 || mWordComposer.isBatchMode()) {
             commitChosenWord(settingsValues, word, LastComposedWord.COMMIT_TYPE_MANUAL_PICK,
                     LastComposedWord.NOT_A_SEPARATOR, 1);
-            mLastComposedWord.deactivate();
+            // A formatter-only case change must remain undoable even when this
+            // suggestion path normally disables undo for manual picks.
+            if (!mLastComposedWord.isHaamidFormattingApplied()) {
+                mLastComposedWord.deactivate();
+            }
             resetComposingWord(settingsValues, false);
         } else {
             final int[] codePoints = StringUtils.toCodePointArray(word);
@@ -525,8 +529,12 @@ public final class InputLogic {
         commitChosenWord(settingsValues, suggestion, LastComposedWord.COMMIT_TYPE_MANUAL_PICK,
                 LastComposedWord.NOT_A_SEPARATOR, suggestionInfo.isKindOf(SuggestedWordInfo.KIND_TYPED) ? 3 : 1);
         mConnection.endBatchEdit();
-        // Don't allow cancellation of manual pick
-        mLastComposedWord.deactivate();
+        // Ordinary manual picks cannot be cancelled, but if Haamid's formatter
+        // changed only the casing, keep that commit active so Backspace restores the
+        // exact suggestion the user selected from the bar.
+        if (!mLastComposedWord.isHaamidFormattingApplied()) {
+            mLastComposedWord.deactivate();
+        }
         // Space state must be updated before calling updateShiftState
         insertOrSetPhantomSpace(settingsValues);
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
