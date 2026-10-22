@@ -245,6 +245,10 @@ public final class InputLogic {
     public void startInput(final String combiningSpec, final SettingsValues settingsValues) {
         mEnteredText = null;
         mWordBeingCorrectedByCursor = null;
+        // Do not carry a pending Title Case undo/edit marker into another editor.
+        mHaamidSkipNextAutomaticFormatting = false;
+        mHaamidWordRestoredByUndo = null;
+        mHaamidFormattingCommitCreatedThisEvent = false;
         numCursorUpdatesSinceInputStarted = 0;
         mConnection.finishComposingText(); // On screen rotation in case we were composing, finish composition before resetting
         mConnection.onStartInput();
@@ -2841,9 +2845,14 @@ public final class InputLogic {
         // The formatter itself preserves acronyms and intentionally mixed-case words.
         final boolean isManualSuggestionPick =
                 commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
+        // Compare the actual text being edited with the word restored by Backspace.
+        // An automatic correction chosen on Space may differ from the restored text even
+        // when the user did not edit it, so only a manually picked suggestion counts as
+        // an intentional suggestion change here.
         final boolean wordChangedAfterHaamidUndo = mHaamidWordRestoredByUndo != null
                 && (!mHaamidWordRestoredByUndo.equals(typedWordForTracking)
-                        || !mHaamidWordRestoredByUndo.equals(chosenWord));
+                        || (isManualSuggestionPick
+                                && !mHaamidWordRestoredByUndo.equals(chosenWord)));
         final boolean skipHaamidFormatting = wordChangedAfterHaamidUndo
                 || (mHaamidSkipNextAutomaticFormatting
                         && (!isManualSuggestionPick || mHaamidWordRestoredByUndo != null));
