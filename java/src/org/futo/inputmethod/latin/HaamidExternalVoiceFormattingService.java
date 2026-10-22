@@ -190,7 +190,8 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
             }
 
             String changed = current.substring(prefix, changedEnd);
-            String formatted = HaamidFormatter.formatAutomatic(changed);
+            String formatted = HaamidApostropheOverrides.apply(
+                    changed, HaamidFormatter.formatAutomatic(changed));
             if (!formatted.equals(changed)) {
                 String replacement = current.substring(0, prefix) + formatted
                         + current.substring(changedEnd);
