@@ -2870,9 +2870,11 @@ public final class InputLogic {
         // what user typed. Note: currently this is done much later in
         // LastComposedWord#didCommitTypedWord by string equality of the remembered
         // strings.
-        final String typedWordForCommitTracking =
-                automaticFormattingChangedText && chosenWord.equals(typedWordForTracking)
-                        ? wordToCommit : typedWordForTracking;
+        // Keep the user's original input for the existing Backspace undo/revert path.
+        // If automatic Title Case changed the committed word, Backspace can restore what
+        // the user typed; choosing a suggestion and pressing Space will then format that
+        // newly chosen word at the next normal commit boundary.
+        final String typedWordForCommitTracking = typedWordForTracking;
         mLastComposedWord = mWordComposer.commitWord(commitType,
                 chosenWordWithSuggestions, separatorString, ngramContext,
                 typedWordForCommitTracking);
