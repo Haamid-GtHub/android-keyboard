@@ -1,9 +1,6 @@
 name: Sync FUTO Source And Build Haamid Keyboard
 
 on:
-  push:
-    branches:
-      - haamid-strict-title-case
   workflow_dispatch:
   schedule:
     - cron: "17 4 * * *"
@@ -27,7 +24,7 @@ jobs:
           submodules: recursive
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure Git
+      - name: Configure Git and fetch FUTO source
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -42,26 +39,30 @@ jobs:
           COUNT="$(git rev-list --count HEAD..upstream/master)"
           if [ "$COUNT" -eq 0 ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No new FUTO commits found."
+            echo "No new FUTO commits found; keeping the current working build."
             exit 0
           fi
 
-          # Fail safely on conflicts. Never overwrite Haamid customizations automatically.
           if ! git merge --no-edit upstream/master; then
             git merge --abort || true
-            echo "::error::FUTO updates conflict with Haamid customizations. No source update was pushed; resolve the conflict manually."
+            echo "::error::FUTO updates conflict with Haamid customizations. No source update was pushed and no APK was published."
             exit 1
           fi
-
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Stop if FUTO source is already current
-        if: steps.sync.outputs.changed != 'true'
-        run: echo "No new upstream source changes; no rebuild is needed."
-
-      - name: Update submodules to merged FUTO revisions
+      - name: Set build version
         if: steps.sync.outputs.changed == 'true'
-        run: git submodule update --init --recursive
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_CODE="$(date +%s)"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
+
+      - name: Verify shared signing key exists
+        if: steps.sync.outputs.changed == 'true'
+        run: test -f java/shared.keystore
 
       - name: Set up Java
         if: steps.sync.outputs.changed == 'true'
@@ -74,53 +75,55 @@ jobs:
         if: steps.sync.outputs.changed == 'true'
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set build version
-        if: steps.sync.outputs.changed == 'true'
-        shell: bash
-        run: |
-          VERSION_CODE=$((30000 + GITHUB_RUN_NUMBER))
-          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
-          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
-          echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
-
       - name: Build stable release APK
         if: steps.sync.outputs.changed == 'true'
         run: |
           chmod +x ./gradlew
           ./gradlew assembleStableRelease --no-daemon --stacktrace
 
+      - name: Verify package name and signing certificate
+        if: steps.sync.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f -print -quit)"
+          if [ -z "$APK" ]; then
+            echo "::error::Stable release APK was not found."
+            exit 1
+          fi
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort | tail -n 1)"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.futo.inputmethod.latin'"
+          "$APKSIGNER" verify --print-certs "$APK"
+
       - name: Prepare APK
         if: steps.sync.outputs.changed == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find . -path '*/build/outputs/apk/*/*.apk' -type f | head -n 1)"
-          if [ -z "$APK" ]; then
-            echo "::error::Built APK could not be found."
-            exit 1
-          fi
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f -print -quit)"
           cp "$APK" HaamidKeyboard.apk
+
+      - name: Push merged source update
+        if: steps.sync.outputs.changed == 'true'
+        run: git push origin HEAD:haamid-strict-title-case
 
       - name: Upload APK artifact
         if: steps.sync.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: HaamidKeyboard-auto-${{ github.run_number }}
+          name: HaamidKeyboard-FUTO-update-${{ env.VERSION_CODE }}
           path: HaamidKeyboard.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Push tested source update
-        if: steps.sync.outputs.changed == 'true'
-        run: git push origin HEAD:haamid-strict-title-case
-
-      - name: Publish APK release
+      - name: Publish APK release and notify watchers
         if: steps.sync.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG="haamid-auto-${GITHUB_RUN_NUMBER}"
+          TAG="haamid-futo-update-$VERSION_CODE"
           gh release create "$TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard Automatic Update ${GITHUB_RUN_NUMBER}" \
-            --notes "Built after merging new FUTO source changes with Haamid's custom formatter changes. Build success does not replace real-device testing. If the source merge conflicts, the workflow stops instead of overwriting customizations."
+            --title "Haamid Keyboard — FUTO Update Built $VERSION_CODE" \
+            --notes "A new FUTO upstream source update was merged and a stable APK was built successfully. Package: org.futo.inputmethod.latin. The APK is built using the repository's shared signing keystore (java/shared.keystore). This is a sideloadable APK, not a Play Store release. Watch repository releases to receive a notification when this build is published."
