@@ -8,7 +8,7 @@ public final class HaamidFormatter {
 
     private static final Set<String> CONTRACTIONS =
             new HashSet<>(Arrays.asList(
-                    "s", "t", "m", "d", "ll", "re", "ve"
+                    "s", "t", "m", "d", "re", "ve"
             ));
 
     private static final char CURLY = '\u2019';
