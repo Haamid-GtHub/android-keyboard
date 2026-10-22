@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.util.List;
@@ -56,15 +57,12 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
                 && (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                     || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                     || eventType == AccessibilityEvent.TYPE_VIEW_CLICKED
+                    || eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED
                     || isGoogleVoiceWindowEvent(event, eventPackage))) {
-            // Keep the most recent target-field snapshot captured from focus/click/text events.
-            // Some Google speech versions do not expose the target field's focus change.
+            // Preserve the last editable-field snapshot: Google often exposes its speech UI
+            // separately from the app whose text is being edited.
             waitingForGoogleVoiceText = true;
             expectedText = null;
-            if (baselineText == null || targetPackage == null) {
-                oldSelectionStart = -1;
-                oldSelectionEnd = -1;
-            }
             handler.removeCallbacks(clearSession);
             handler.postDelayed(clearSession, SESSION_TIMEOUT_MS);
             return;
@@ -87,10 +85,10 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
         try {
             if (!source.isEditable() || source.isPassword() || source.getText() == null) return;
 
-            if (!waitingForGoogleVoiceText) {
-                // Track the latest focused editable field and its current text. This provides a
-                // baseline even when the speech UI never emits a useful focus event of its own.
-                baselineText = source.getText().toString();
+            String current = source.getText().toString();
+            if (!waitingForGoogleVoiceText && eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+                // Snapshot the focused field before a possible speech insertion.
+                baselineText = current;
                 targetPackage = eventPackage;
                 expectedText = null;
                 oldSelectionStart = source.getTextSelectionStart();
@@ -98,31 +96,50 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
                 return;
             }
 
-            if (baselineText == null) {
+            if (!waitingForGoogleVoiceText) {
+                // Fallback for Android/Google builds that emit no accessible Google voice event:
+                // recognize only a pure multi-character insertion. Normal per-key typing and
+                // replacement/composition updates are ignored. This also covers pasted text.
+                if (event.getAddedCount() < 2 || event.getRemovedCount() != 0) {
+                    baselineText = current;
+                    targetPackage = eventPackage;
+                    oldSelectionStart = source.getTextSelectionStart();
+                    oldSelectionEnd = source.getTextSelectionEnd();
+                    return;
+                }
                 CharSequence before = event.getBeforeText();
                 if (before != null) {
                     baselineText = before.toString();
                 } else {
-                    // Some Android/editor combinations omit beforeText. For a pure insertion,
-                    // reconstruct the prior value from the current text and event indices.
-                    // Do not guess when existing text was replaced or removed.
-                    CharSequence currentSequence = source.getText();
                     int from = event.getFromIndex();
                     int added = event.getAddedCount();
-                    if (currentSequence == null || event.getRemovedCount() != 0
-                            || added <= 0 || from < 0
-                            || from + added > currentSequence.length()) {
+                    if (added <= 0 || from < 0 || from + added > current.length()) return;
+                    baselineText = current.substring(0, from)
+                            + current.substring(from + added);
+                }
+                targetPackage = eventPackage;
+                waitingForGoogleVoiceText = true;
+                handler.removeCallbacks(clearSession);
+                handler.postDelayed(clearSession, SESSION_TIMEOUT_MS);
+            } else if (baselineText == null) {
+                CharSequence before = event.getBeforeText();
+                if (before != null) {
+                    baselineText = before.toString();
+                } else {
+                    int from = event.getFromIndex();
+                    int added = event.getAddedCount();
+                    if (event.getRemovedCount() != 0 || added <= 0 || from < 0
+                            || from + added > current.length()) {
                         return;
                     }
-                    String currentValue = currentSequence.toString();
-                    baselineText = currentValue.substring(0, from)
-                            + currentValue.substring(from + added);
+                    baselineText = current.substring(0, from)
+                            + current.substring(from + added);
                 }
                 targetPackage = eventPackage;
             }
 
-            if (!eventPackage.equals(targetPackage)) return;
-            expectedText = source.getText().toString();
+            if (targetPackage == null || !eventPackage.equals(targetPackage)) return;
+            expectedText = current;
             oldSelectionStart = source.getTextSelectionStart();
             oldSelectionEnd = source.getTextSelectionEnd();
 
@@ -142,28 +159,15 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
             return;
         }
 
-        AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) {
+        AccessibilityNodeInfo field = findTargetInputField();
+        if (field == null) {
             resetSession();
             return;
         }
 
-        AccessibilityNodeInfo field = null;
         try {
-            field = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-            if (field == null || !field.isEditable()) {
-                resetSession();
-                return;
-            }
-            if (field.isPassword() || field.getText() == null
-                    || field.getPackageName() == null
-                    || !targetPackage.contentEquals(field.getPackageName())) {
-                resetSession();
-                return;
-            }
-
             String current = field.getText().toString();
-            // Never overwrite text if the user or app changed it after the voice result.
+            // Never overwrite text if the user or app changed it after the insertion event.
             if (!current.equals(expectedText)) {
                 resetSession();
                 return;
@@ -217,10 +221,67 @@ public final class HaamidExternalVoiceFormattingService extends AccessibilitySer
                 }
             }
         } finally {
-            if (field != null) field.recycle();
-            root.recycle();
+            field.recycle();
             resetSession();
         }
+    }
+
+    /**
+     * Google voice UIs may occupy the active window while the real editable field remains in
+     * another accessible window. Search all windows for the expected focused field.
+     */
+    private AccessibilityNodeInfo findTargetInputField() {
+        AccessibilityNodeInfo activeRoot = getRootInActiveWindow();
+        if (activeRoot != null) {
+            AccessibilityNodeInfo field = findTargetFieldInRoot(activeRoot);
+            activeRoot.recycle();
+            if (field != null) return field;
+        }
+
+        List<AccessibilityWindowInfo> windows = getWindows();
+        if (windows == null) return null;
+        for (AccessibilityWindowInfo window : windows) {
+            if (window == null) continue;
+            AccessibilityNodeInfo root = window.getRoot();
+            AccessibilityNodeInfo field = null;
+            if (root != null) {
+                field = findTargetFieldInRoot(root);
+                root.recycle();
+            }
+            window.recycle();
+            if (field != null) return field;
+        }
+        return null;
+    }
+
+    private AccessibilityNodeInfo findTargetFieldInRoot(AccessibilityNodeInfo root) {
+        AccessibilityNodeInfo focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+        if (isExpectedTargetField(focused)) return focused;
+        if (focused != null) focused.recycle();
+        return findFocusedEditableDescendant(root);
+    }
+
+    private AccessibilityNodeInfo findFocusedEditableDescendant(AccessibilityNodeInfo node) {
+        if (isExpectedTargetField(node) && node.isFocused()) {
+            return AccessibilityNodeInfo.obtain(node);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child == null) continue;
+            AccessibilityNodeInfo found = findFocusedEditableDescendant(child);
+            child.recycle();
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private boolean isExpectedTargetField(AccessibilityNodeInfo node) {
+        if (node == null || !node.isEditable() || node.isPassword() || node.getText() == null
+                || node.getPackageName() == null || targetPackage == null) {
+            return false;
+        }
+        return targetPackage.contentEquals(node.getPackageName())
+                && expectedText != null && expectedText.contentEquals(node.getText());
     }
 
     private static int mapSelection(int position, int changedStart, int changedEnd,
