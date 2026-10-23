@@ -2898,13 +2898,21 @@ public final class InputLogic {
         // the editor contents on every keystroke, which can duplicate text or disturb cursors.
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
-        // Number-leading tokens (for example, "2nd") are deliberately exempt from Haamid
-        // Title Case. If the keyboard's suggestion casing changes such a token without
-        // changing its letters, keep the user's exact typed casing instead of committing
-        // a spurious form such as "2Nd". HaamidFormatter itself remains unchanged.
-        if (!typedWordForTracking.isEmpty() && !chosenWord.isEmpty()
-                && Character.isDigit(typedWordForTracking.charAt(0))
-                && Character.isDigit(chosenWord.charAt(0))
+        // Some input paths may commit a leading digit before the following letters enter
+        // the composing word (for example, "2" followed by "nd"). In that case the
+        // composing word is only "nd", so checking its first character misses the numeric
+        // prefix. RichInputConnection exposes the committed text immediately before the
+        // composing word through getCodePointBeforeCursor().
+        final boolean typedWordStartsWithDigit = !typedWordForTracking.isEmpty()
+                && Character.isDigit(typedWordForTracking.charAt(0));
+        final boolean composingWordFollowsDigit = !typedWordForTracking.isEmpty()
+                && Character.isDigit(mConnection.getCodePointBeforeCursor());
+        final boolean isNumberLeadingTypedToken =
+                typedWordStartsWithDigit || composingWordFollowsDigit;
+        // Number-leading tokens are exempt from automatic Title Case. Preserve the user's
+        // exact typed casing if the keyboard's suggestion changes only letter case.
+        if (isNumberLeadingTypedToken && !typedWordForTracking.isEmpty()
+                && !chosenWord.isEmpty()
                 && typedWordForTracking.equalsIgnoreCase(chosenWord)) {
             wordToCommit = typedWordForTracking;
         }
@@ -2933,8 +2941,6 @@ public final class InputLogic {
         // Number-leading tokens are exempt from automatic Title Case. Preserve the user's
         // original casing (handled above when the suggestion is the same token) and do not
         // let a dictionary suggestion turn "2nd" into "2Nd" when Space commits the word.
-        final boolean isNumberLeadingTypedToken = !typedWordForTracking.isEmpty()
-                && Character.isDigit(typedWordForTracking.charAt(0));
         if (!skipHaamidFormatting && !isNumberLeadingTypedToken
                 && !hasIntentionalMixedCase(chosenWord)
                 && shouldApplyHaamidAutomaticFormatting()) {
