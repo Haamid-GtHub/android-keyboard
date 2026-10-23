@@ -89,6 +89,30 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testAutomaticTitleCasePreservesNumberLeadingTokenAfterDigitCommit() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            // Commit the digit first, then remove only the separator to simulate an input
+            // path where the following letters begin a new composing word after a number.
+            type("2");
+            type(Constants.CODE_SPACE);
+            assertEquals("digit is committed before letters are entered", "2 ",
+                    mEditText.getText().toString());
+
+            type(Constants.CODE_DELETE);
+            assertEquals("Backspace removes only the separator after the digit", "2",
+                    mEditText.getText().toString());
+
+            type("nd");
+            type(Constants.CODE_SPACE);
+            assertEquals("number-leading token keeps its casing after a committed digit",
+                    "2nd ", mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testAutomaticTitleCasePreservesNumberLeadingThird() {
         assertNumberLeadingTokenPreservesCase("3rd");
     }
