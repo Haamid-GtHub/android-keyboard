@@ -2910,11 +2910,11 @@ public final class InputLogic {
         final boolean isNumberLeadingTypedToken =
                 typedWordStartsWithDigit || composingWordFollowsDigit
                         || mWordComposer.isAttachedToNonWord();
-        // Number-leading tokens are exempt from automatic Title Case. Preserve the user's
-        // exact typed casing if the keyboard's suggestion changes only letter case.
-        if (isNumberLeadingTypedToken && !typedWordForTracking.isEmpty()
-                && !chosenWord.isEmpty()
-                && typedWordForTracking.equalsIgnoreCase(chosenWord)) {
+        // Number-leading tokens must preserve the exact typed composing text. In some input
+        // paths the digit is already committed and only the letters are composing, so the
+        // dictionary candidate may not have the same shape as the full visible token. Do not
+        // let autocorrection or capitalization rewrite that text after a number.
+        if (isNumberLeadingTypedToken && !typedWordForTracking.isEmpty()) {
             wordToCommit = typedWordForTracking;
         }
         boolean haamidFormattingChanged = false;
