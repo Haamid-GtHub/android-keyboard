@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   build:
+    if: false # Temporarily hold APK publishing until regression tests complete
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repository And Submodules
