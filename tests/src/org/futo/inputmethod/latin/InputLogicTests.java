@@ -75,6 +75,20 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testAutomaticTitleCasePreservesNumberLeadingTokenTypedInSeparateSteps() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("2");
+            type("nd");
+            type(Constants.CODE_SPACE);
+            assertEquals("number-leading token typed in separate steps keeps its casing",
+                    "2nd ", mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testAutomaticTitleCasePreservesNumberLeadingThird() {
         assertNumberLeadingTokenPreservesCase("3rd");
     }
