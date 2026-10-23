@@ -2908,7 +2908,8 @@ public final class InputLogic {
         final boolean composingWordFollowsDigit = !typedWordForTracking.isEmpty()
                 && Character.isDigit(mConnection.getCodePointBeforeCursor());
         final boolean isNumberLeadingTypedToken =
-                typedWordStartsWithDigit || composingWordFollowsDigit;
+                typedWordStartsWithDigit || composingWordFollowsDigit
+                        || mWordComposer.isAttachedToNonWord();
         // Number-leading tokens are exempt from automatic Title Case. Preserve the user's
         // exact typed casing if the keyboard's suggestion changes only letter case.
         if (isNumberLeadingTypedToken && !typedWordForTracking.isEmpty()
