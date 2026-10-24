@@ -99,6 +99,13 @@ public final class HaamidFormatter {
                         ? String.valueOf(CURLY)
                         : "'";
 
+        // "Y'all" uses a title-cased second segment, unlike contractions such as
+        // "must've". Preserve either straight or curly apostrophe.
+        final String normalizedWord = word.replace(CURLY, '\'');
+        if ("y'all".equalsIgnoreCase(normalizedWord)) {
+            return "Y" + apostrophe + "All";
+        }
+
         String[] parts =
                 word.replace(String.valueOf(CURLY), "'")
                         .split("'");
