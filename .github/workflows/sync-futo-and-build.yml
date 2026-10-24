@@ -50,29 +50,26 @@ jobs:
           echo "UPSTREAM_REF=$UPSTREAM_REF" >> "$GITHUB_ENV"
           echo "Using upstream ref: $UPSTREAM_REF"
 
-      - name: Protect Haamid-customized files from upstream replacement
+      - name: Identify overlapping custom and FUTO changes
         id: protect
         shell: bash
         run: |
           set -euo pipefail
           BASE="$(git merge-base HEAD "$UPSTREAM_REF")" || {
-            echo "::warning::No common base with FUTO was found. Keeping all Haamid code unchanged and building the existing app if upstream has new commits."
-            echo "safe=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::No common base with FUTO was found. Stopping instead of publishing an APK that misses the upstream update."
+            exit 1
           }
           git diff --name-only "$BASE"...HEAD | sort -u > /tmp/haamid-changed-files.txt
           git diff --name-only "$BASE...$UPSTREAM_REF" | sort -u > /tmp/futo-changed-files.txt
           comm -12 /tmp/haamid-changed-files.txt /tmp/futo-changed-files.txt > /tmp/overlapping-files.txt
           if [ -s /tmp/overlapping-files.txt ]; then
-            echo "::warning::FUTO and Haamid both changed these files. To protect custom modifications, this run will not merge upstream source; it will build the current Haamid app and list the files for manual review."
+            echo "::warning::FUTO and Haamid changed some of the same files. The merge will prefer Haamid's conflicting lines while retaining non-conflicting upstream changes:"
             cat /tmp/overlapping-files.txt
-            echo "safe=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo "No overlapping modified files found."
           fi
-          echo "No overlapping modified files found; safe to attempt the normal merge."
-          echo "safe=true" >> "$GITHUB_OUTPUT"
 
-      - name: Merge latest FUTO source without overwriting custom code
+      - name: Merge latest FUTO source while preferring Haamid's conflicting changes
         id: sync
         shell: bash
         run: |
@@ -86,17 +83,12 @@ jobs:
           fi
 
           echo "changed=true" >> "$GITHUB_OUTPUT"
-          if [ "${{ steps.protect.outputs.safe }}" != "true" ]; then
-            echo "merged=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::An upstream update exists, but automatic merging was skipped to protect Haamid customizations. The current customized app will still be built."
-            exit 0
-          fi
-
-          if ! git merge --no-edit "$UPSTREAM_REF"; then
+          # -X ours favors Haamid's version only for conflicting hunks; other upstream
+          # changes can still merge. It does not replace entire customized files wholesale.
+          if ! git merge --no-edit -X ours "$UPSTREAM_REF"; then
             git merge --abort || true
-            echo "merged=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::FUTO update could not be merged cleanly. The existing customized app will still be built; no upstream source changes will be pushed."
-            exit 0
+            echo "::error::FUTO changes could not be merged safely. Stopping before build/release rather than publishing stale source."
+            exit 1
           fi
           echo "merged=true" >> "$GITHUB_OUTPUT"
 
@@ -125,11 +117,13 @@ jobs:
         if: steps.sync.outputs.changed == 'true'
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Prebuild regression test APK before starting emulator
+      - name: Prebuild regression test APK
         if: steps.sync.outputs.changed == 'true'
+        id: test_apk_build
+        continue-on-error: true
         run: ./gradlew assembleStableDebugAndroidTest --no-daemon --stacktrace
 
-      - name: Run Android regression tests before publishing
+      - name: Run Android regression tests
         if: steps.sync.outputs.changed == 'true'
         id: regression
         continue-on-error: true
@@ -193,17 +187,12 @@ jobs:
         run: |
           set -euo pipefail
           TAG="haamid-futo-update-$VERSION_CODE"
-          if [ "${{ steps.sync.outputs.merged }}" = "true" ]; then
-            SOURCE_NOTE="FUTO upstream updates were merged because no customized files overlapped. Haamid customizations were retained."
-          else
-            TAG="haamid-futo-protected-build-$VERSION_CODE"
-            SOURCE_NOTE="A FUTO update was detected, but automatic merging was skipped because files overlapped or the merge was unsafe. This APK was built from the existing Haamid-customized source to avoid overwriting custom modifications. Review the Actions log before expecting the latest FUTO changes."
-          fi
+          SOURCE_NOTE="FUTO upstream updates were merged. Conflicting hunks favored Haamid's existing custom code; non-conflicting upstream changes were retained."
 
-          if [ "${{ steps.regression.outcome }}" = "success" ]; then
+          if [ "${{ steps.test_apk_build.outcome }}" = "success" ] && [ "${{ steps.regression.outcome }}" = "success" ]; then
             TEST_NOTE="Automated regression tests passed."
           else
-            TEST_NOTE="WARNING: Automated regression tests failed or could not complete. The stableRelease APK was still built and its package/signature checks passed; this does not mean the tests passed. Review the Actions run before deciding whether to install."
+            TEST_NOTE="WARNING: Regression test APK preparation or automated tests failed/could not complete. The stableRelease APK was still built and its package/signature checks passed; review the Actions run before deciding whether to install."
           fi
 
           gh release create "$TAG" HaamidKeyboard.apk \
