@@ -14,7 +14,8 @@ concurrency:
 
 jobs:
   sync-build-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
     steps:
       - name: Check out Haamid branch and submodules
         uses: actions/checkout@v4
@@ -28,22 +29,40 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote add upstream https://github.com/futo-org/android-keyboard.git
-          git fetch upstream master
+          # Prefer FUTO's GitLab source; fall back to its GitHub mirror if unavailable.
+          git remote add upstream https://gitlab.futo.org/keyboard/latinime.git
+          if git fetch upstream master; then
+            UPSTREAM_REF="upstream/master"
+          elif git fetch upstream main; then
+            UPSTREAM_REF="upstream/main"
+          else
+            echo "::warning::FUTO GitLab fetch failed; trying the GitHub mirror."
+            git remote add futo-mirror https://github.com/futo-org/android-keyboard.git
+            if git fetch futo-mirror master; then
+              UPSTREAM_REF="futo-mirror/master"
+            elif git fetch futo-mirror main; then
+              UPSTREAM_REF="futo-mirror/main"
+            else
+              echo "::error::Could not fetch FUTO source from GitLab or GitHub mirror."
+              exit 1
+            fi
+          fi
+          echo "UPSTREAM_REF=$UPSTREAM_REF" >> "$GITHUB_ENV"
+          echo "Using upstream ref: $UPSTREAM_REF"
 
       - name: Merge latest FUTO source safely
         id: sync
         shell: bash
         run: |
           set -euo pipefail
-          COUNT="$(git rev-list --count HEAD..upstream/master)"
+          COUNT="$(git rev-list --count "HEAD..$UPSTREAM_REF")"
           if [ "$COUNT" -eq 0 ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No new FUTO commits found; keeping the current working build."
             exit 0
           fi
 
-          if ! git merge --no-edit upstream/master; then
+          if ! git merge --no-edit "$UPSTREAM_REF"; then
             git merge --abort || true
             echo "::error::FUTO updates conflict with Haamid customizations. No source update was pushed and no APK was published."
             exit 1
@@ -74,6 +93,17 @@ jobs:
       - name: Set up Gradle
         if: steps.sync.outputs.changed == 'true'
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Android regression tests before publishing
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -no-audio -no-metrics -camera-back none -camera-front none
+          disable-animations: true
+          script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
 
       - name: Build stable release APK
         if: steps.sync.outputs.changed == 'true'
