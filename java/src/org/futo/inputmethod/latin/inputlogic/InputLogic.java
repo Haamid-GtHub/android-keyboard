@@ -2878,7 +2878,14 @@ public final class InputLogic {
                 else if (Character.isLowerCase(ch)) partLower = true;
             }
             if (partUpper && partLower) {
-                return true;
+                // A normally Title-Cased apostrophe segment (for example "Clock" in
+                // "O'Clock") is not an intentional mixed-case spelling. Preserve only
+                // genuinely mixed internal casing such as "iPhone" or "eBay".
+                final boolean titleCasedPart = Character.isUpperCase(part.charAt(0))
+                        && part.substring(1).equals(part.substring(1).toLowerCase(Locale.ROOT));
+                if (!titleCasedPart) {
+                    return true;
+                }
             }
 
             // A contraction suffix is intentionally lowercase. Preserve an uppercase or
