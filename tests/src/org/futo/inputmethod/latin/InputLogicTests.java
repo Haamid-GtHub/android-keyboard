@@ -300,6 +300,19 @@ public class InputLogicTests extends InputTestsBase {
         }
     }
 
+    public void testAutomaticTitleCaseFormatsApostropheWordWithTitleCasedSegment() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("O'clock");
+            type(Constants.CODE_SPACE);
+            assertEquals("apostrophe word formats its lowercase segment", "O'Clock ",
+                    mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testAutomaticTitleCasePreservesIntentionalMixedCaseContraction() {
         final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
         HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
