@@ -2843,9 +2843,10 @@ public final class InputLogic {
      * @param separatorString the separator that's causing the commit, or NOT_A_SEPARATOR if none.
      */
     /**
-     * Preserve mixed-case words exactly as the user entered them. The formatter processes
-     * apostrophe-separated parts independently, so this guard is needed for intentional forms
-     * such as "can'T" to avoid changing them to "Can'T" at the word-commit boundary.
+     * Preserve intentional mixed-case spellings, but allow normal Title Case formatting
+     * across apostrophe-separated parts such as "Y'all" -> "Y'All". Mixed case inside
+     * a part (for example "O'Neil") remains untouched, as do deliberately mis-cased
+     * contraction suffixes such as "can'T".
      */
     private boolean hasIntentionalMixedCase(final String word) {
         boolean hasUppercase = false;
@@ -2857,7 +2858,35 @@ public final class InputLogic {
             } else if (Character.isLowerCase(ch)) {
                 hasLowercase = true;
             }
-            if (hasUppercase && hasLowercase) {
+        }
+        if (!hasUppercase || !hasLowercase) {
+            return false;
+        }
+
+        if (word.indexOf('\'') < 0 && word.indexOf('\u2019') < 0) {
+            return true;
+        }
+
+        final String[] parts = word.replace('\u2019', '\'').split("\\'", -1);
+        for (int i = 0; i < parts.length; i++) {
+            final String part = parts[i];
+            boolean partUpper = false;
+            boolean partLower = false;
+            for (int j = 0; j < part.length(); j++) {
+                final char ch = part.charAt(j);
+                if (Character.isUpperCase(ch)) partUpper = true;
+                else if (Character.isLowerCase(ch)) partLower = true;
+            }
+            if (partUpper && partLower) {
+                return true;
+            }
+
+            // A contraction suffix is intentionally lowercase. Preserve an uppercase or
+            // mixed-case suffix exactly as typed instead of normalizing "can'T" to "Can't".
+            if (i > 0 && ("s".equalsIgnoreCase(part) || "t".equalsIgnoreCase(part)
+                    || "m".equalsIgnoreCase(part) || "d".equalsIgnoreCase(part)
+                    || "ll".equalsIgnoreCase(part) || "re".equalsIgnoreCase(part)
+                    || "ve".equalsIgnoreCase(part)) && !part.equals(part.toLowerCase(Locale.ROOT))) {
                 return true;
             }
         }
