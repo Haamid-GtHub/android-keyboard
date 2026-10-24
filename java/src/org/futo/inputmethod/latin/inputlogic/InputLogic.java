@@ -3013,14 +3013,19 @@ public final class InputLogic {
         // the editor contents on every keystroke, which can duplicate text or disturb cursors.
         final String typedWordForTracking = mWordComposer.getTypedWord();
         String wordToCommit = chosenWord;
-        // Some input paths may commit a leading digit before the following letters enter
-        // the composing word (for example, "2" followed by "nd"). In that case the
-        // composing word is only "nd", so checking its first character misses the numeric
-        // prefix. RichInputConnection exposes the committed text immediately before the
-        // composing word through getCodePointBeforeCursor().
-        final boolean isNumberLeadingTypedToken = isNumberLeadingTypedToken(
-                typedWordForTracking, mConnection.getCodePointBeforeCursor(),
-                mWordComposer.isAttachedToNonWord(), mConnection.spacePrecedesComposingText());
+        final boolean isManualSuggestionPick =
+                commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
+        // A selected suggestion is a new candidate word. Do not let the previous token
+        // (for example, "2nd") suppress Title Case on the next selected word. For manual
+        // picks, protect only a candidate that itself starts with a digit. For typed/automatic
+        // commits, retain context detection for paths where a digit was committed separately
+        // and the composing letters are only a suffix (for example, "2" + "nd").
+        final boolean isNumberLeadingTypedToken = isManualSuggestionPick
+                ? isNumberLeadingTypedToken(chosenWord, -1, false, true)
+                : isNumberLeadingTypedToken(
+                        typedWordForTracking, mConnection.getCodePointBeforeCursor(),
+                        mWordComposer.isAttachedToNonWord(),
+                        mConnection.spacePrecedesComposingText());
         // Number-leading tokens must preserve the exact typed composing text. In some input
         // paths the digit is already committed and only the letters are composing, so the
         // dictionary candidate may not have the same shape as the full visible token. Do not
@@ -3033,8 +3038,6 @@ public final class InputLogic {
         // An explicitly picked suggestion is a completed-word action and must still be
         // formatted, even if a cursor-edit skip flag was left over from an earlier selection.
         // The formatter itself preserves acronyms and intentionally mixed-case words.
-        final boolean isManualSuggestionPick =
-                commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK;
         // Compare the actual text being edited with the word restored by Backspace.
         // An automatic correction chosen on Space may differ from the restored text even
         // when the user did not edit it, so only a manually picked suggestion counts as
