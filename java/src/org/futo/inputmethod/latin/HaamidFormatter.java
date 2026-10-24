@@ -99,6 +99,12 @@ public final class HaamidFormatter {
                         ? String.valueOf(CURLY)
                         : "'";
 
+        // Preserve the established special title case for y'all, including curly apostrophes.
+        String normalizedWord = word.replace(String.valueOf(CURLY), "'");
+        if ("y'all".equalsIgnoreCase(normalizedWord)) {
+            return "Y" + apostrophe + "All";
+        }
+
         String[] parts =
                 word.replace(String.valueOf(CURLY), "'")
                         .split("'");
