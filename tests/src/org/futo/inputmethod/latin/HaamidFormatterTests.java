@@ -50,6 +50,14 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         assertEquals("NASA And CPU", HaamidFormatter.format("NASA and CPU"));
     }
 
+    public void testNumberLeadingTokenDetectionDoesNotLeakToFollowingSuggestion() {
+        // The number and its suffix remain protected, but the next word after a space
+        // must not inherit that protection when selected from the suggestion bar.
+        assertTrue(InputLogic.isNumberLeadingTypedToken("2nd", ' '));
+        assertTrue(InputLogic.isNumberLeadingTypedToken("nd", '2'));
+        assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' '));
+    }
+
     public void testPreservesWordsBeginningWithDigits() {
         assertEquals("4g 5GHz 802.11ac", HaamidFormatter.format("4g 5GHz 802.11ac"));
     }
