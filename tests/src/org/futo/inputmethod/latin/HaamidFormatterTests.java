@@ -2,6 +2,8 @@ package org.futo.inputmethod.latin;
 
 import android.test.AndroidTestCase;
 
+import org.futo.inputmethod.latin.inputlogic.InputLogic;
+
 /**
  * Regression tests for Haamid's custom title-case rules.
  */
