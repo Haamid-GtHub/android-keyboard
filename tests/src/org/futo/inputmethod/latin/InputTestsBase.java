@@ -222,7 +222,10 @@ public class InputTestsBase extends ServiceTestCase<LatinIME> {
                 true, true /* defaultValue */);
         mPreviousAutoCorrectSetting = setBooleanPreference(Settings.PREF_AUTO_CORRECTION,
                 DEFAULT_AUTO_CORRECTION, DEFAULT_AUTO_CORRECTION);
-        getService().onCreate();
+        // LifecycleRegistry enforces that Service lifecycle transitions run on the main thread.
+        // Older ServiceTestCase fixtures invoked this directly from the instrumentation thread,
+        // causing every inherited input test to fail before reaching its assertions.
+        getInstrumentation().runOnMainSync(() -> getService().onCreate());
         EditorInfo ei = new EditorInfo();
         final InputConnection ic = mEditText.onCreateInputConnection(ei);
         final LayoutInflater inflater =
