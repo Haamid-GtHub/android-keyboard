@@ -1,10 +1,9 @@
 name: Haamid Stable APK
 
 on:
+  # Keep this debug-flavor workflow available for manual diagnostics only.
+  # Pushes should run the signed release workflow, not produce a second debug APK.
   workflow_dispatch:
-  push:
-    branches:
-      - haamid-strict-title-case
 
 permissions:
   contents: write

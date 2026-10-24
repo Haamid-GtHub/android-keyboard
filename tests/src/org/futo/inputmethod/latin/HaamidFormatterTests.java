@@ -94,4 +94,16 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         commit.markHaamidFormattingApplied();
         assertFalse(commit.canRevertCommit());
     }
+
+    public void testCaseOnlyAutoCorrectionRemainsUndoableAfterTitleCase() {
+        LastComposedWord commit = new LastComposedWord(
+                new java.util.ArrayList<org.futo.inputmethod.event.Event>(),
+                null, "can'T", "Can't", " ", null, WordComposer.CAPS_MODE_OFF);
+
+        commit.markAutoCorrectionChangedTypedWord();
+        commit.markHaamidFormattingApplied();
+
+        assertTrue(commit.isAutoCorrectionChangedTypedWord());
+        assertTrue(commit.canRevertCommit());
+    }
 }

@@ -1530,10 +1530,11 @@ public final class InputLogic {
                 mHaamidWordRestoredByUndo = null;
             }
             final boolean isLexicalAutoCorrection =
-                    mLastComposedWord.mTypedWord != null
+                    mLastComposedWord.isAutoCorrectionChangedTypedWord()
+                    || (mLastComposedWord.mTypedWord != null
                     && mLastComposedWord.mCommittedWord != null
                     && !mLastComposedWord.mTypedWord.equalsIgnoreCase(
-                            mLastComposedWord.mCommittedWord.toString());
+                            mLastComposedWord.mCommittedWord.toString()));
             if (mLastComposedWord.canRevertCommit()
                     && !mLastComposedWord.isManualSuggestionPick()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
@@ -3079,6 +3080,13 @@ public final class InputLogic {
                 typedWordForCommitTracking);
         if (commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
             mLastComposedWord.markManualSuggestionPick();
+        }
+        // Remember a real automatic correction separately from Title Case. The corrected
+        // spelling can differ from the user's exact input only by case (for example can'T
+        // -> can't), but Backspace must still restore the exact original input after formatting.
+        if (commitType == LastComposedWord.COMMIT_TYPE_DECIDED_WORD
+                && !chosenWord.equals(typedWordForTracking)) {
+            mLastComposedWord.markAutoCorrectionChangedTypedWord();
         }
         if (haamidFormattingChanged) {
             // Keep the original typed word and make this one commit undoable. The end-of-event

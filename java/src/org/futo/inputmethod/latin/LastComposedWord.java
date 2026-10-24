@@ -58,6 +58,9 @@ public final class LastComposedWord {
     private boolean mActive;
     // True only when Haamid's automatic formatter changed the committed word's casing.
     private boolean mHaamidFormattingApplied;
+    // True when automatic correction changed the exact text the user typed, even if the
+    // difference is only case. Backspace should restore that exact original spelling.
+    private boolean mAutoCorrectionChangedTypedWord;
     // A manually selected suggestion is a deliberate choice, not an auto-correction undo target.
     private boolean mManualSuggestionPick;
 
@@ -99,6 +102,14 @@ public final class LastComposedWord {
 
     public boolean isHaamidFormattingApplied() {
         return mHaamidFormattingApplied;
+    }
+
+    public void markAutoCorrectionChangedTypedWord() {
+        mAutoCorrectionChangedTypedWord = true;
+    }
+
+    public boolean isAutoCorrectionChangedTypedWord() {
+        return mAutoCorrectionChangedTypedWord;
     }
 
     public void markManualSuggestionPick() {
