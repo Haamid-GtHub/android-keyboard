@@ -2,9 +2,6 @@ name: Build Haamid Keyboard APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - haamid-strict-title-case
 
 permissions:
   contents: write
@@ -43,6 +40,8 @@ jobs:
           echo "BUILD_TAG=haamid-stable-manual-$VERSION_CODE" >> "$GITHUB_ENV"
 
       - name: Run Android Regression Tests
+        id: regression
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -78,7 +77,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Installable APK Release
+      - name: Publish Verified Stable APK Release
+        if: steps.regression.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -88,7 +88,22 @@ jobs:
             exit 1
           fi
           cp "$APK" HaamidKeyboard.apk
-          TAG="$BUILD_TAG"
-          gh release create "$TAG" HaamidKeyboard.apk \
+          gh release create "$BUILD_TAG" HaamidKeyboard.apk \
             --title "Haamid Keyboard Stable Manual $VERSION_CODE" \
-            --notes "Stable-flavor APK built from branch haamid-strict-title-case. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore. Install over a previous Haamid build only if Android confirms the signing certificate matches."
+            --notes "Stable-flavor APK built from branch haamid-strict-title-case. Automated regression tests passed. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore. Install over a previous Haamid build only if Android confirms the signing certificate matches."
+
+      - name: Publish Test-Failed Candidate APK
+        if: steps.regression.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::Candidate APK could not be found."
+            exit 1
+          fi
+          cp "$APK" HaamidKeyboard.apk
+          gh release create "haamid-candidate-$VERSION_CODE" HaamidKeyboard.apk \
+            --title "Haamid Keyboard Candidate $VERSION_CODE — Tests Need Review" \
+            --prerelease \
+            --notes "Candidate APK built from branch haamid-strict-title-case so an automated test failure does not hide the build from the user. Regression tests did not pass; this is NOT a verified stable release. Review the linked Actions run before installing. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore."
