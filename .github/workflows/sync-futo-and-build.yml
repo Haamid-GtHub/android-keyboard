@@ -59,7 +59,7 @@ jobs:
             exit 1
           }
           git diff --name-only "$BASE"...HEAD | sort -u > /tmp/haamid-changed-files.txt
-          git diff --name-only "$BASE"... "$UPSTREAM_REF" | sort -u > /tmp/futo-changed-files.txt
+          git diff --name-only "$BASE...$UPSTREAM_REF" | sort -u > /tmp/futo-changed-files.txt
           comm -12 /tmp/haamid-changed-files.txt /tmp/futo-changed-files.txt > /tmp/overlapping-files.txt
           if [ -s /tmp/overlapping-files.txt ]; then
             echo "::error::FUTO and Haamid both changed these files since their common base. Automatic sync is blocked to protect the customized keyboard:"
