@@ -657,6 +657,22 @@ public class InputLogicTests extends InputTestsBase {
                 EXPECTED_RESULT, mEditText.getText().toString());
     }
 
+    public void testAutomaticTitleCaseAppliesToConsecutiveSuggestionPicks() {
+        final boolean previousSetting = HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), true);
+        try {
+            type("2nd ");
+            type("hello");
+            pickSuggestionManually("hello");
+            type("world");
+            pickSuggestionManually("world");
+            assertEquals("each consecutively selected suggestion receives Title Case",
+                    "2nd Hello World", mEditText.getText().toString());
+        } finally {
+            HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), previousSetting);
+        }
+    }
+
     public void testNoSpaceAfterManualPick() {
         final String WORD_TO_TYPE = "this";
         final String EXPECTED_RESULT = WORD_TO_TYPE;
