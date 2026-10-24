@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Check Out Repository And Submodules
         uses: actions/checkout@v4
@@ -31,6 +32,17 @@ jobs:
 
       - name: Verify Shared Signing Key Is Present
         run: test -f java/shared.keystore && test ! -f keystore.properties
+
+      - name: Run Android Regression Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -no-audio -no-metrics -camera-back none -camera-front none
+          disable-animations: true
+          script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
 
       - name: Set Build Version
         shell: bash
