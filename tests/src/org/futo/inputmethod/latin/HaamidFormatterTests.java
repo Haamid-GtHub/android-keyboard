@@ -32,6 +32,14 @@ public final class HaamidFormatterTests extends AndroidTestCase {
 
     public void testOtherApostropheWordsKeepTitleCase() {
         assertEquals("O'Clock Y'All", HaamidFormatter.format("o'clock y'all"));
+        assertEquals("O'Clock", HaamidFormatter.formatAutomatic("O'clock"));
+        assertEquals("Y'All", HaamidFormatter.formatAutomatic("Y'all"));
+        assertEquals("Y'All", HaamidFormatter.formatAutomatic("y'all"));
+    }
+
+    public void testAutomaticFormattingPreservesAcronymSms() {
+        assertEquals("SMS", HaamidFormatter.formatAutomatic("SMS"));
+        assertEquals("SMS And NASA", HaamidFormatter.formatAutomatic("SMS and NASA"));
     }
 
     public void testNormalizesEntirelyUppercaseInput() {
