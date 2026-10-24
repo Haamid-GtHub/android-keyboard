@@ -96,6 +96,8 @@ jobs:
 
       - name: Run Android regression tests before publishing
         if: steps.sync.outputs.changed == 'true'
+        id: regression
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -148,13 +150,25 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish APK release and notify watchers
-        if: steps.sync.outputs.changed == 'true'
+      - name: Publish verified stable APK release and notify watchers
+        if: steps.sync.outputs.changed == 'true' && steps.regression.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           TAG="haamid-futo-update-$VERSION_CODE"
           gh release create "$TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard — FUTO Update Built $VERSION_CODE" \
-            --notes "A new FUTO upstream source update was merged and a stable APK was built successfully. Package: org.futo.inputmethod.latin. The APK is built using the repository's shared signing keystore (java/shared.keystore). This is a sideloadable APK, not a Play Store release. Watch repository releases to receive a notification when this build is published."
+            --title "Haamid Keyboard — FUTO Update $VERSION_CODE" \
+            --notes "A new FUTO upstream source update was merged while retaining Haamid customizations. Automated regression tests passed. Package: org.futo.inputmethod.latin. Built with the repository's shared signing keystore. Watch repository releases for notifications."
+
+      - name: Publish candidate APK if tests fail
+        if: steps.sync.outputs.changed == 'true' && steps.regression.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="haamid-futo-candidate-$VERSION_CODE"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard — FUTO Candidate $VERSION_CODE (Tests Need Review)" \
+            --prerelease \
+            --notes "A new FUTO upstream source update was merged while retaining Haamid customizations. The APK was built and package/signature checks passed, but automated regression tests did not pass or could not complete. This candidate is available so a test failure does not hide the update, but it is NOT a verified stable release. Review the Actions run before installing. Package: org.futo.inputmethod.latin. Built with the repository's shared signing keystore."
