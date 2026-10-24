@@ -40,26 +40,11 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
           echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
-          echo "BUILD_TAG=haamid-stable-manual-$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "BUILD_TAG=haamid-untested-$VERSION_CODE" >> "$GITHUB_ENV"
 
-      - name: Prebuild regression test APK before starting emulator
-        run: ./gradlew assembleStableDebugAndroidTest --no-daemon --stacktrace
-
-      - name: Run Android Regression Tests
-        id: regression
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          target: default
-          arch: x86_64
-          profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -no-audio -no-metrics -camera-back none -camera-front none
-          disable-animations: true
-          script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
-
-      - name: Build Stable Release APK
-        run: ./gradlew assembleStableRelease --stacktrace
+      # Regression tests are intentionally skipped at the user's request.
+      - name: Build Release APK
+        run: ./gradlew assembleStableRelease --no-daemon --stacktrace
 
       - name: Verify Package Name And Signing Certificate
         shell: bash
@@ -78,38 +63,23 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: haamid-keyboard-stable-release-apk
+          name: haamid-keyboard-apk-tests-skipped
           path: '**/build/outputs/apk/stable/release/*.apk'
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Verified Stable APK Release
-        if: steps.regression.outcome == 'success'
+      - name: Publish APK Release (Tests Skipped)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f | head -n 1)"
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f -print -quit)"
           if [ -z "$APK" ]; then
-            echo "::error::Built stable release APK could not be found."
+            echo "::error::Built APK could not be found."
             exit 1
           fi
           cp "$APK" HaamidKeyboard.apk
           gh release create "$BUILD_TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard Stable Manual $VERSION_CODE" \
-            --notes "Stable-flavor APK built from branch haamid-strict-title-case. Automated regression tests passed. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore. Install over a previous Haamid build only if Android confirms the signing certificate matches."
-
-      - name: Publish Test-Failed Candidate APK
-        if: steps.regression.outcome != 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f | head -n 1)"
-          if [ -z "$APK" ]; then
-            echo "::error::Candidate APK could not be found."
-            exit 1
-          fi
-          cp "$APK" HaamidKeyboard.apk
-          gh release create "haamid-candidate-$VERSION_CODE" HaamidKeyboard.apk \
-            --title "Haamid Keyboard Candidate $VERSION_CODE — Tests Need Review" \
+            --title "Haamid Keyboard Build $VERSION_CODE (Tests Skipped)" \
             --prerelease \
-            --notes "Candidate APK built from branch haamid-strict-title-case so an automated test failure does not hide the build from the user. Regression tests did not pass; this is NOT a verified stable release. Review the linked Actions run before installing. Package: org.futo.inputmethod.latin. Uses the repository's shared signing keystore."
+            --notes "APK built from branch haamid-strict-title-case. Automated regression tests were intentionally skipped at the user's request. Package: org.futo.inputmethod.latin. The APK build, package name, and signing certificate are checked by this workflow, but app behavior is NOT regression-tested. Uses the repository's shared signing keystore."
