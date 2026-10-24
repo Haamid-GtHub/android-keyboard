@@ -2969,9 +2969,12 @@ public final class InputLogic {
         if (typedWord == null || typedWord.isEmpty()) {
             return false;
         }
+        // A leading digit in the composing token always identifies a numeric token.
+        // Context from before the composing text is relevant only when there is no space:
+        // after "2nd ", the next suggestion ("hello") is a normal word and must be formatted.
         return Character.isDigit(typedWord.codePointAt(0))
-                || Character.isDigit(codePointBeforeCursor)
-                || (attachedToNonWord && !spacePrecedesComposingText);
+                || (!spacePrecedesComposingText
+                    && (Character.isDigit(codePointBeforeCursor) || attachedToNonWord));
     }
 
     private boolean shouldApplyHaamidAutomaticFormatting() {
