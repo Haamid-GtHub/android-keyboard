@@ -26,7 +26,12 @@ public final class HaamidFormatter {
         for (int i = 0; i <= text.length(); i++) {
             if (i == text.length() || text.charAt(i) == '\n') {
                 String line = text.substring(start, i);
-                result.append(isEntireTextUppercase(line) ? line : format(line));
+                // Keep ordinary all-caps tokens intact as an acronym safeguard, but
+                // still normalize apostrophe forms such as Y'ALL and O'CLOCK. These have
+                // explicit formatter rules and should not bypass them just because every
+                // letter was typed in uppercase.
+                boolean hasApostrophe = line.indexOf('\'') >= 0 || line.indexOf(CURLY) >= 0;
+                result.append(isEntireTextUppercase(line) && !hasApostrophe ? line : format(line));
                 if (i < text.length()) {
                     result.append('\n');
                 }
