@@ -59,7 +59,8 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         // must not inherit that protection when selected from the suggestion bar.
         assertTrue(InputLogic.isNumberLeadingTypedToken("2nd", ' ', false, false));
         assertTrue(InputLogic.isNumberLeadingTypedToken("nd", '2', true, false));
-        assertTrue(InputLogic.isNumberLeadingTypedToken("word", 'x', true, false));
+        // A preceding letter plus attached-to-non-word state is not a numeric token.
+        assertFalse(InputLogic.isNumberLeadingTypedToken("word", 'x', true, false));
         assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' ', true, true));
         assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' ', false, true));
         // A stale digit context must not suppress formatting once a space separates words.
