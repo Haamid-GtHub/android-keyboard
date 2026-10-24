@@ -2970,11 +2970,13 @@ public final class InputLogic {
             return false;
         }
         // A leading digit in the composing token always identifies a numeric token.
-        // Context from before the composing text is relevant only when there is no space:
-        // after "2nd ", the next suggestion ("hello") is a normal word and must be formatted.
+        // A separately committed digit can also prefix the composing letters (for example,
+        // "2" + "nd"), but only when the previous character is itself a digit and no space
+        // separates it. Do not treat attachedToNonWord alone as numeric: it can also be true
+        // for ordinary alphanumeric contexts and suppress Title Case on a picked suggestion.
         return Character.isDigit(typedWord.codePointAt(0))
                 || (!spacePrecedesComposingText
-                    && (Character.isDigit(codePointBeforeCursor) || attachedToNonWord));
+                    && Character.isDigit(codePointBeforeCursor));
     }
 
     private boolean shouldApplyHaamidAutomaticFormatting() {
