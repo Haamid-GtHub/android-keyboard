@@ -62,6 +62,8 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         assertTrue(InputLogic.isNumberLeadingTypedToken("word", 'x', true, false));
         assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' ', true, true));
         assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' ', false, true));
+        // A stale digit context must not suppress formatting once a space separates words.
+        assertFalse(InputLogic.isNumberLeadingTypedToken("hello", '2', true, true));
     }
 
     public void testPreservesWordsBeginningWithDigits() {
