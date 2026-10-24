@@ -37,6 +37,8 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         assertEquals("O'Clock", HaamidFormatter.formatAutomatic("O'clock"));
         assertEquals("Y'All", HaamidFormatter.formatAutomatic("Y'all"));
         assertEquals("Y'All", HaamidFormatter.formatAutomatic("y'all"));
+        assertEquals("Y’All", HaamidFormatter.formatAutomatic("y’all"));
+        assertEquals("O’Clock", HaamidFormatter.formatAutomatic("o’clock"));
     }
 
     public void testAutomaticFormattingPreservesAcronymSms() {
