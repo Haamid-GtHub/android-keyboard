@@ -2938,6 +2938,26 @@ public final class InputLogic {
         return false;
     }
 
+    /**
+     * Returns whether the current composing text belongs to a token that begins with a digit.
+     * Do not use WordComposer.isAttachedToNonWord() here: that flag can remain true for an
+     * ordinary word typed after a number, causing a manually selected suggestion such as
+     * "hello" after "2nd " to bypass Title Case.
+     *
+     * If the digit was committed separately, the composing letters directly follow that digit
+     * (for example "2" + "nd"), so the character before the composing text identifies the
+     * number-leading token. A separator such as the space in "2nd hello" means the next word
+     * must be formatted normally.
+     */
+    public static boolean isNumberLeadingTypedToken(
+            final String typedWord, final int codePointBeforeCursor) {
+        if (typedWord == null || typedWord.isEmpty()) {
+            return false;
+        }
+        return Character.isDigit(typedWord.codePointAt(0))
+                || Character.isDigit(codePointBeforeCursor);
+    }
+
     private boolean shouldApplyHaamidAutomaticFormatting() {
         if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
             return false;
@@ -2977,13 +2997,8 @@ public final class InputLogic {
         // composing word is only "nd", so checking its first character misses the numeric
         // prefix. RichInputConnection exposes the committed text immediately before the
         // composing word through getCodePointBeforeCursor().
-        final boolean typedWordStartsWithDigit = !typedWordForTracking.isEmpty()
-                && Character.isDigit(typedWordForTracking.charAt(0));
-        final boolean composingWordFollowsDigit = !typedWordForTracking.isEmpty()
-                && Character.isDigit(mConnection.getCodePointBeforeCursor());
-        final boolean isNumberLeadingTypedToken =
-                typedWordStartsWithDigit || composingWordFollowsDigit
-                        || mWordComposer.isAttachedToNonWord();
+        final boolean isNumberLeadingTypedToken = isNumberLeadingTypedToken(
+                typedWordForTracking, mConnection.getCodePointBeforeCursor());
         // Number-leading tokens must preserve the exact typed composing text. In some input
         // paths the digit is already committed and only the letters are composing, so the
         // dictionary candidate may not have the same shape as the full visible token. Do not
