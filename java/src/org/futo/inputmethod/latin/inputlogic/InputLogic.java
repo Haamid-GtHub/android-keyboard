@@ -2868,6 +2868,43 @@ public final class InputLogic {
         }
 
         final String[] parts = word.replace('\u2019', '\'').split("\\'", -1);
+
+        // A normal apostrophe word can be mixed-case as a whole while each segment is
+        // consistently cased (for example Y'all or O'Clock). Do not mistake that for an
+        // intentional mixed-case brand/name; the automatic formatter must normalize each
+        // segment independently. Keep the deliberate contraction-suffix safeguard below.
+        boolean hasMixedSegment = false;
+        for (String part : parts) {
+            boolean partUpper = false;
+            boolean partLower = false;
+            for (int j = 0; j < part.length(); j++) {
+                final char ch = part.charAt(j);
+                if (Character.isUpperCase(ch)) partUpper = true;
+                else if (Character.isLowerCase(ch)) partLower = true;
+            }
+            if (partUpper && partLower) {
+                final boolean titleCasedPart = Character.isUpperCase(part.charAt(0))
+                        && part.substring(1).equals(part.substring(1).toLowerCase(Locale.ROOT));
+                if (!titleCasedPart) {
+                    hasMixedSegment = true;
+                    break;
+                }
+            }
+        }
+        if (!hasMixedSegment) {
+            for (int i = 1; i < parts.length; i++) {
+                final String part = parts[i];
+                if (("s".equalsIgnoreCase(part) || "t".equalsIgnoreCase(part)
+                        || "m".equalsIgnoreCase(part) || "d".equalsIgnoreCase(part)
+                        || "ll".equalsIgnoreCase(part) || "re".equalsIgnoreCase(part)
+                        || "ve".equalsIgnoreCase(part))
+                        && !part.equals(part.toLowerCase(Locale.ROOT))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         for (int i = 0; i < parts.length; i++) {
             final String part = parts[i];
             boolean partUpper = false;
