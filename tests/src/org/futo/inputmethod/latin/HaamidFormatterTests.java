@@ -53,9 +53,11 @@ public final class HaamidFormatterTests extends AndroidTestCase {
     public void testNumberLeadingTokenDetectionDoesNotLeakToFollowingSuggestion() {
         // The number and its suffix remain protected, but the next word after a space
         // must not inherit that protection when selected from the suggestion bar.
-        assertTrue(InputLogic.isNumberLeadingTypedToken("2nd", ' '));
-        assertTrue(InputLogic.isNumberLeadingTypedToken("nd", '2'));
-        assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' '));
+        assertTrue(InputLogic.isNumberLeadingTypedToken("2nd", ' ', false, false));
+        assertTrue(InputLogic.isNumberLeadingTypedToken("nd", '2', true, false));
+        assertTrue(InputLogic.isNumberLeadingTypedToken("word", 'x', true, false));
+        assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' ', true, true));
+        assertFalse(InputLogic.isNumberLeadingTypedToken("hello", ' ', false, true));
     }
 
     public void testPreservesWordsBeginningWithDigits() {
