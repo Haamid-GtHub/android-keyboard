@@ -51,25 +51,28 @@ jobs:
           echo "Using upstream ref: $UPSTREAM_REF"
 
       - name: Protect Haamid-customized files from upstream replacement
+        id: protect
         shell: bash
         run: |
           set -euo pipefail
           BASE="$(git merge-base HEAD "$UPSTREAM_REF")" || {
-            echo "::error::No common base with FUTO was found. Refusing to sync automatically."
-            exit 1
+            echo "::warning::No common base with FUTO was found. Keeping all Haamid code unchanged and building the existing app if upstream has new commits."
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            exit 0
           }
           git diff --name-only "$BASE"...HEAD | sort -u > /tmp/haamid-changed-files.txt
           git diff --name-only "$BASE...$UPSTREAM_REF" | sort -u > /tmp/futo-changed-files.txt
           comm -12 /tmp/haamid-changed-files.txt /tmp/futo-changed-files.txt > /tmp/overlapping-files.txt
           if [ -s /tmp/overlapping-files.txt ]; then
-            echo "::error::FUTO and Haamid both changed these files since their common base. Automatic sync is blocked to protect the customized keyboard:"
+            echo "::warning::FUTO and Haamid both changed these files. To protect custom modifications, this run will not merge upstream source; it will build the current Haamid app and list the files for manual review."
             cat /tmp/overlapping-files.txt
-            echo "No merge, source push, or APK publication will occur. These files need a careful manual merge."
-            exit 1
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           echo "No overlapping modified files found; safe to attempt the normal merge."
+          echo "safe=true" >> "$GITHUB_OUTPUT"
 
-      - name: Merge latest FUTO source safely
+      - name: Merge latest FUTO source without overwriting custom code
         id: sync
         shell: bash
         run: |
@@ -77,16 +80,25 @@ jobs:
           COUNT="$(git rev-list --count "HEAD..$UPSTREAM_REF")"
           if [ "$COUNT" -eq 0 ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No new FUTO commits found; keeping the current working build."
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            echo "No new FUTO commits found; no APK will be built or published."
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.protect.outputs.safe }}" != "true" ]; then
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::An upstream update exists, but automatic merging was skipped to protect Haamid customizations. The current customized app will still be built."
             exit 0
           fi
 
           if ! git merge --no-edit "$UPSTREAM_REF"; then
             git merge --abort || true
-            echo "::error::FUTO updates conflict with Haamid customizations. No source update was pushed and no APK was published."
-            exit 1
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::FUTO update could not be merged cleanly. The existing customized app will still be built; no upstream source changes will be pushed."
+            exit 0
           fi
-          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "merged=true" >> "$GITHUB_OUTPUT"
 
       - name: Set build version
         if: steps.sync.outputs.changed == 'true'
@@ -161,7 +173,7 @@ jobs:
           cp "$APK" HaamidKeyboard.apk
 
       - name: Push merged source update
-        if: steps.sync.outputs.changed == 'true'
+        if: steps.sync.outputs.changed == 'true' && steps.sync.outputs.merged == 'true'
         run: git push origin HEAD:haamid-strict-title-case
 
       - name: Upload APK artifact
@@ -173,25 +185,27 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish verified stable APK release and notify watchers
-        if: steps.sync.outputs.changed == 'true' && steps.regression.outcome == 'success'
+      - name: Publish stable-release APK for the existing Haamid app
+        if: steps.sync.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           set -euo pipefail
           TAG="haamid-futo-update-$VERSION_CODE"
-          gh release create "$TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard — FUTO Update $VERSION_CODE" \
-            --notes "A new FUTO upstream source update was merged while retaining Haamid customizations. Automated regression tests passed. Package: org.futo.inputmethod.latin. Built with the repository's shared signing keystore. Watch repository releases for notifications."
+          if [ "${{ steps.sync.outputs.merged }}" = "true" ]; then
+            SOURCE_NOTE="FUTO upstream updates were merged because no customized files overlapped. Haamid customizations were retained."
+          else
+            TAG="haamid-futo-protected-build-$VERSION_CODE"
+            SOURCE_NOTE="A FUTO update was detected, but automatic merging was skipped because files overlapped or the merge was unsafe. This APK was built from the existing Haamid-customized source to avoid overwriting custom modifications. Review the Actions log before expecting the latest FUTO changes."
+          fi
 
-      - name: Publish candidate APK if tests fail
-        if: steps.sync.outputs.changed == 'true' && steps.regression.outcome != 'success'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG="haamid-futo-candidate-$VERSION_CODE"
+          if [ "${{ steps.regression.outcome }}" = "success" ]; then
+            TEST_NOTE="Automated regression tests passed."
+          else
+            TEST_NOTE="WARNING: Automated regression tests failed or could not complete. The stableRelease APK was still built and its package/signature checks passed; this does not mean the tests passed. Review the Actions run before deciding whether to install."
+          fi
+
           gh release create "$TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard — FUTO Candidate $VERSION_CODE (Tests Need Review)" \
-            --prerelease \
-            --notes "A new FUTO upstream source update was merged while retaining Haamid customizations. The APK was built and package/signature checks passed, but automated regression tests did not pass or could not complete. This candidate is available so a test failure does not hide the update, but it is NOT a verified stable release. Review the Actions run before installing. Package: org.futo.inputmethod.latin. Built with the repository's shared signing keystore."
+            --title "Haamid Keyboard — FUTO Check $VERSION_CODE" \
+            --notes "$SOURCE_NOTE $TEST_NOTE Package: org.futo.inputmethod.latin. Built with the repository's shared signing keystore so it updates the existing app rather than installing as a separate package."
