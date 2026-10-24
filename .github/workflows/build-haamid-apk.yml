@@ -39,6 +39,9 @@ jobs:
           echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
           echo "BUILD_TAG=haamid-stable-manual-$VERSION_CODE" >> "$GITHUB_ENV"
 
+      - name: Prebuild regression test APK before starting emulator
+        run: ./gradlew assembleStableDebugAndroidTest --no-daemon --stacktrace
+
       - name: Run Android Regression Tests
         id: regression
         continue-on-error: true
