@@ -50,6 +50,25 @@ jobs:
           echo "UPSTREAM_REF=$UPSTREAM_REF" >> "$GITHUB_ENV"
           echo "Using upstream ref: $UPSTREAM_REF"
 
+      - name: Protect Haamid-customized files from upstream replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$(git merge-base HEAD "$UPSTREAM_REF")" || {
+            echo "::error::No common base with FUTO was found. Refusing to sync automatically."
+            exit 1
+          }
+          git diff --name-only "$BASE"...HEAD | sort -u > /tmp/haamid-changed-files.txt
+          git diff --name-only "$BASE"... "$UPSTREAM_REF" | sort -u > /tmp/futo-changed-files.txt
+          comm -12 /tmp/haamid-changed-files.txt /tmp/futo-changed-files.txt > /tmp/overlapping-files.txt
+          if [ -s /tmp/overlapping-files.txt ]; then
+            echo "::error::FUTO and Haamid both changed these files since their common base. Automatic sync is blocked to protect the customized keyboard:"
+            cat /tmp/overlapping-files.txt
+            echo "No merge, source push, or APK publication will occur. These files need a careful manual merge."
+            exit 1
+          fi
+          echo "No overlapping modified files found; safe to attempt the normal merge."
+
       - name: Merge latest FUTO source safely
         id: sync
         shell: bash
