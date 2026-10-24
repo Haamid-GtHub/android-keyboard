@@ -17,6 +17,7 @@ jobs:
       - name: Check out source and submodules
         uses: actions/checkout@v4
         with:
+          ref: haamid-strict-title-case
           fetch-depth: 0
           submodules: recursive
 
@@ -67,10 +68,11 @@ jobs:
       - name: Run Android regression tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 30
           target: default
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -no-audio -no-metrics -camera-back none -camera-front none
           disable-animations: true
           script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
 
