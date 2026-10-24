@@ -431,10 +431,25 @@ public final class InputLogic {
             }
             resetComposingWord(settingsValues, false);
         } else {
-            final int[] codePoints = StringUtils.toCodePointArray(word);
+            // In no-auto-space mode, a picked single-word suggestion remains composing so
+            // the user can continue choosing suggestions. Apply Title Case to that selected
+            // word here; otherwise repeated suggestion picks bypass commitChosenWord() and
+            // every selected word can remain unformatted.
+            String wordToCompose = word;
+            final boolean isNumberLeadingSuggestion = isNumberLeadingTypedToken(
+                    word, mConnection.getCodePointBeforeCursor(),
+                    mWordComposer.isAttachedToNonWord(),
+                    mConnection.spacePrecedesComposingText());
+            if (!isNumberLeadingSuggestion
+                    && !hasIntentionalMixedCase(word)
+                    && shouldApplyHaamidAutomaticFormatting()) {
+                wordToCompose = HaamidApostropheOverrides.apply(
+                        word, HaamidFormatter.formatAutomatic(word));
+            }
+            final int[] codePoints = StringUtils.toCodePointArray(wordToCompose);
             mWordComposer.setComposingWord(codePoints,
                     mImeHelper.getCodepointCoordinates(codePoints));
-            setComposingTextInternal(word, 1);
+            setComposingTextInternal(wordToCompose, 1);
         }
 
         if(needToUpdateSuggestionStrip) postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_TYPING);
