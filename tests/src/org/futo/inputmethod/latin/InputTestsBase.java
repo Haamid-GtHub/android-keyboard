@@ -81,6 +81,7 @@ public class InputTestsBase extends ServiceTestCase<LatinIME> {
     protected InputConnection mInputConnection;
     private boolean mPreviousAutoCorrectSetting;
     private boolean mPreviousBigramPredictionSettings;
+    private boolean mPreviousHaamidAutomaticFormattingSetting;
 
     public InputTestsBase(Class<LatinIME> serviceClass) {
         super(serviceClass);
@@ -200,6 +201,11 @@ public class InputTestsBase extends ServiceTestCase<LatinIME> {
     @Override
     protected void setUp() throws Exception {
         super.setUp();
+        // Keep legacy FUTO input tests independent from Haamid's opt-in behavior.
+        // Tests specifically covering automatic Title Case enable it explicitly.
+        mPreviousHaamidAutomaticFormattingSetting =
+                HaamidFormattingSettings.isAutomaticFormattingEnabled();
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(getContext(), false);
         mEditText = new MyEditText(getContext());
         final int inputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE;
@@ -247,6 +253,8 @@ public class InputTestsBase extends ServiceTestCase<LatinIME> {
                 true /* defaultValue */);
         setBooleanPreference(Settings.PREF_AUTO_CORRECTION, mPreviousAutoCorrectSetting,
                 DEFAULT_AUTO_CORRECTION);
+        HaamidFormattingSettings.setAutomaticFormattingEnabled(
+                getContext(), mPreviousHaamidAutomaticFormattingSetting);
         setDebugMode(false);
         mLatinIMELegacy.recycle();
         super.tearDown();
