@@ -85,6 +85,10 @@ jobs:
           git diff --check
           echo "updated=true" >> "$GITHUB_OUTPUT"
 
+      - name: Refresh FUTO Submodules At The Merged Revisions
+        if: steps.sync.outputs.updated == 'true'
+        run: git submodule update --init --recursive
+
       - name: Verify Shared Signing Key
         if: steps.sync.outputs.updated == 'true'
         run: |
