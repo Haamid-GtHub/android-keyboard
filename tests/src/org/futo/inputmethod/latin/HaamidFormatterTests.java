@@ -17,6 +17,23 @@ public final class HaamidFormatterTests extends AndroidTestCase {
                 HaamidFormatter.format("iPhone ChatGPT YouTube macOS"));
     }
 
+    public void testHyphenatedWordsAreNotMistakenForMixedCaseNames() {
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("E-mail"));
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("e-mail"));
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("To-day"));
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("re-enter"));
+        assertTrue(HaamidFormatter.hasIntentionalMixedCase("iPhone"));
+        assertTrue(HaamidFormatter.hasIntentionalMixedCase("eBay"));
+        assertTrue(HaamidFormatter.hasIntentionalMixedCase("iPhone-like"));
+    }
+
+    public void testApostropheSafeguardsRemainIntact() {
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("Y'all"));
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("O'Clock"));
+        assertTrue(HaamidFormatter.hasIntentionalMixedCase("can'T"));
+        assertTrue(HaamidFormatter.hasIntentionalMixedCase("O'Neil"));
+    }
+
     public void testFormatsContractionsAndApostropheSegments() {
         assertEquals("Don't Must've Rock'N'Roll",
                 HaamidFormatter.format("don't must've rock'n'roll"));
