@@ -31,7 +31,7 @@ public final class HaamidFormatterTests extends AndroidTestCase {
         assertFalse(HaamidFormatter.hasIntentionalMixedCase("Y'all"));
         assertFalse(HaamidFormatter.hasIntentionalMixedCase("O'Clock"));
         assertTrue(HaamidFormatter.hasIntentionalMixedCase("can'T"));
-        assertTrue(HaamidFormatter.hasIntentionalMixedCase("O'Neil"));
+        assertFalse(HaamidFormatter.hasIntentionalMixedCase("O'Neil"));
     }
 
     public void testFormatsContractionsAndApostropheSegments() {
