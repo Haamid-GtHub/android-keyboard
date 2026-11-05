@@ -17,16 +17,17 @@ public final class HaamidFormatterTests extends AndroidTestCase {
                 HaamidFormatter.format("iPhone ChatGPT YouTube macOS"));
     }
 
-    public void testHyphenatedSuggestionsAreNotMistakenForMixedCaseNames() {
-        assertFalse(InputLogic.hasIntentionalMixedCase("E-mail"));
-        assertFalse(InputLogic.hasIntentionalMixedCase("e-mail"));
-        assertFalse(InputLogic.hasIntentionalMixedCase("re-enter"));
-        assertTrue(InputLogic.hasIntentionalMixedCase("eBay"));
-        assertTrue(InputLogic.hasIntentionalMixedCase("iPhone"));
-        assertTrue(InputLogic.hasIntentionalMixedCase("iPhone-like"));
-        assertEquals("E-Mail", HaamidFormatter.formatAutomatic("E-mail"));
-        assertEquals("E-Mail", HaamidFormatter.formatAutomatic("e-mail"));
-        assertEquals("Re-Enter", HaamidFormatter.formatAutomatic("re-enter"));
+    public void testManualTypingFormatsHyphenatedWordsWithoutMixedCaseBypass() {
+        assertEquals("E-Mail", HaamidFormatter.format("E-mail"));
+        assertEquals("E-Mail", HaamidFormatter.format("e-mail"));
+        assertEquals("To-Day", HaamidFormatter.format("to-day"));
+        assertEquals("To-Day", HaamidFormatter.format("To-day"));
+        assertEquals("Re-Enter", HaamidFormatter.format("re-enter"));
+    }
+
+    public void testManualTypingStillPreservesMixedCaseNamesAndAcronyms() {
+        assertEquals("iPhone eBay", HaamidFormatter.format("iPhone eBay"));
+        assertEquals("NASA And CPU", HaamidFormatter.format("NASA and CPU"));
     }
 
     public void testFormatsContractionsAndApostropheSegments() {
