@@ -104,7 +104,12 @@ public final class HaamidFormatter {
             }
     
             if (word.indexOf('\'') < 0 && word.indexOf('\u2019') < 0) {
-                return true;
+                // Ordinary Title Case (To, Mail, Enter) is not intentional mixed casing.
+                // Preserve only nonstandard internal casing such as iPhone and eBay.
+                final boolean titleCasedPart = Character.isUpperCase(word.charAt(0))
+                        && word.substring(1).equals(word.substring(1).toLowerCase(Locale.ROOT));
+                return !titleCasedPart;
+            }
             }
     
             final String[] parts = word.replace('\u2019', '\'').split("\\'", -1);
