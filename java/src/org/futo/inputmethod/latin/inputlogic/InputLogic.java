@@ -2864,7 +2864,7 @@ public final class InputLogic {
      * a part (for example "O'Neil") remains untouched, as do deliberately mis-cased
      * contraction suffixes such as "can'T".
      */
-    private boolean hasIntentionalMixedCase(final String word) {
+    static boolean hasIntentionalMixedCase(final String word) {
         boolean hasUppercase = false;
         boolean hasLowercase = false;
         for (int i = 0; i < word.length(); i++) {
@@ -2880,6 +2880,26 @@ public final class InputLogic {
         }
 
         if (word.indexOf('\'') < 0 && word.indexOf('\u2019') < 0) {
+            // A hyphen separates independent word parts (for example, "E-mail").
+            // Do not mistake the initial capital on the first part plus lowercase
+            // letters in the next part for intentional internal mixed casing.
+            // Genuine mixed-case parts such as "eBay" and "iPhone" remain protected.
+            if (word.indexOf('-') >= 0) {
+                final String[] hyphenatedParts = word.split("-", -1);
+                for (String part : hyphenatedParts) {
+                    boolean partUpper = false;
+                    boolean partLower = false;
+                    for (int i = 0; i < part.length(); i++) {
+                        final char ch = part.charAt(i);
+                        if (Character.isUpperCase(ch)) partUpper = true;
+                        else if (Character.isLowerCase(ch)) partLower = true;
+                    }
+                    if (partUpper && partLower) {
+                        return true;
+                    }
+                }
+                return false;
+            }
             return true;
         }
 
