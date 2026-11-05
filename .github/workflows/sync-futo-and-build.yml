@@ -220,7 +220,7 @@ jobs:
 
           HAAMID_TAG="haamid-futo-$FUTO_TAG"
           gh release create "$HAAMID_TAG" HaamidKeyboard.apk \
-            --target HEAD \
+            --target "$(git rev-parse HEAD)" \
             --title "Haamid Keyboard — FUTO $FUTO_TAG" \
             --notes "Based on FUTO's official stable app release $FUTO_TAG. FUTO changes were merged without forced conflict resolution. The existing shared signing keystore was preserved. $TEST_NOTE Package: org.futo.inputmethod.latin. Download and install this APK manually to update Haamid Keyboard."
 
