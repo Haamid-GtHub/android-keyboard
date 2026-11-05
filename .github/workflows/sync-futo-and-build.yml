@@ -108,10 +108,10 @@ jobs:
           # Even a clean line-level merge can introduce behavioural regressions in a shared file.
           CUSTOM_PATHS="$(git diff --name-only "$BASE" HEAD | sort -u)"
           UPSTREAM_PATHS="$(git diff --name-only "$BASE" "$UPSTREAM_REF" | sort -u)"
-          OVERLAPPING_PATHS="$(comm -12 <(printf '%s\\n' "$CUSTOM_PATHS") <(printf '%s\\n' "$UPSTREAM_PATHS"))"
+          OVERLAPPING_PATHS="$(comm -12 <(printf '%s\n' "$CUSTOM_PATHS") <(printf '%s\n' "$UPSTREAM_PATHS"))"
           if [ -n "$OVERLAPPING_PATHS" ]; then
             echo "::error::FUTO and Haamid changed the same files. Refusing automatic merge to protect custom keyboard features:"
-            printf '%s\\n' "$OVERLAPPING_PATHS"
+            printf '%s\n' "$OVERLAPPING_PATHS"
             exit 1
           fi
 
@@ -191,6 +191,8 @@ jobs:
 
       - name: Verify Package Name And APK Signature
         if: steps.release.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
