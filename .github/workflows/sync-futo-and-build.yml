@@ -165,16 +165,14 @@ jobs:
         if: steps.release.outputs.updated == 'true'
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Compile Android Regression Test APK (Non-Blocking)
+      - name: Compile Android Regression Test APK (Required)
         if: steps.release.outputs.updated == 'true'
         id: test_apk_build
-        continue-on-error: true
         run: ./gradlew assembleStableDebugAndroidTest --no-daemon --stacktrace
 
-      - name: Run Android Regression Tests (Non-Blocking)
+      - name: Run Android Regression Tests (Required)
         if: steps.release.outputs.updated == 'true'
         id: regression
-        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -241,11 +239,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ steps.test_apk_build.outcome }}" = "success" ] && [ "${{ steps.regression.outcome }}" = "success" ]; then
-            TEST_NOTE="Automated Android regression tests passed."
-          else
-            TEST_NOTE="WARNING: Automated regression tests could not complete successfully (test APK build: ${{ steps.test_apk_build.outcome }}; emulator tests: ${{ steps.regression.outcome }}). These test failures did not block this release. The stable APK build, package-name check, and signing verification passed. Please install cautiously and report any issue."
-          fi
+          TEST_NOTE="Required automated Android regression tests passed."
 
           HAAMID_TAG="haamid-futo-$FUTO_TAG"
           gh release create "$HAAMID_TAG" HaamidKeyboard.apk \
