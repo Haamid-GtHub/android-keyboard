@@ -213,7 +213,7 @@ jobs:
 
           # Compare against the last known stable Haamid APK, not merely against the keystore file's existence.
           mkdir -p /tmp/known-haamid
-          gh release download haamid-stable-manual-1792830017 --repo Haamid-GtHub/android-keyboard \\
+          gh release download haamid-stable-manual-1792830017 --repo Haamid-GtHub/android-keyboard \
             --pattern HaamidKeyboard.apk --dir /tmp/known-haamid
           "$APKSIGNER" verify --print-certs /tmp/known-haamid/HaamidKeyboard.apk | tee /tmp/known-haamid-signature.txt
           KNOWN_CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/known-haamid-signature.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
