@@ -29,9 +29,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git remote add upstream https://github.com/futo-org/android-keyboard.git
-          git fetch upstream master
-          echo "ref=upstream/master" >> "$GITHUB_OUTPUT"
+          git remote add upstream https://gitlab.futo.org/keyboard/latinime.git
+          if git fetch upstream master; then
+            echo "ref=upstream/master" >> "$GITHUB_OUTPUT"
+          elif git fetch upstream main; then
+            echo "ref=upstream/main" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::FUTO GitLab source could not be fetched; falling back to the public GitHub mirror."
+            git remote add futo-mirror https://github.com/futo-org/android-keyboard.git
+            if git fetch futo-mirror master; then
+              echo "ref=futo-mirror/master" >> "$GITHUB_OUTPUT"
+            elif git fetch futo-mirror main; then
+              echo "ref=futo-mirror/main" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::Could not fetch FUTO source from GitLab or GitHub. No update was made."
+              exit 1
+            fi
+          fi
 
       - name: Merge FUTO Updates Without Overwriting Custom Code
         id: sync
