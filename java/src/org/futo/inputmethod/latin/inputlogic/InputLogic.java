@@ -441,7 +441,6 @@ public final class InputLogic {
                     mWordComposer.isAttachedToNonWord(),
                     mConnection.spacePrecedesComposingText());
             if (!isNumberLeadingSuggestion
-                    && !hasIntentionalMixedCase(word)
                     && shouldApplyHaamidAutomaticFormatting()) {
                 wordToCompose = HaamidApostropheOverrides.apply(
                         word, HaamidFormatter.formatAutomatic(word));
@@ -2859,121 +2858,6 @@ public final class InputLogic {
      * @param separatorString the separator that's causing the commit, or NOT_A_SEPARATOR if none.
      */
     /**
-     * Preserve intentional mixed-case spellings, but allow normal Title Case formatting
-     * across apostrophe-separated parts such as "Y'all" -> "Y'All". Mixed case inside
-     * a part (for example "O'Neil") remains untouched, as do deliberately mis-cased
-     * contraction suffixes such as "can'T".
-     */
-    static boolean hasIntentionalMixedCase(final String word) {
-        boolean hasUppercase = false;
-        boolean hasLowercase = false;
-        for (int i = 0; i < word.length(); i++) {
-            final char ch = word.charAt(i);
-            if (Character.isUpperCase(ch)) {
-                hasUppercase = true;
-            } else if (Character.isLowerCase(ch)) {
-                hasLowercase = true;
-            }
-        }
-        if (!hasUppercase || !hasLowercase) {
-            return false;
-        }
-
-        if (word.indexOf('\'') < 0 && word.indexOf('\u2019') < 0) {
-            // A hyphen separates independent word parts (for example, "E-mail").
-            // Do not mistake the initial capital on the first part plus lowercase
-            // letters in the next part for intentional internal mixed casing.
-            // Genuine mixed-case parts such as "eBay" and "iPhone" remain protected.
-            if (word.indexOf('-') >= 0) {
-                final String[] hyphenatedParts = word.split("-", -1);
-                for (String part : hyphenatedParts) {
-                    boolean partUpper = false;
-                    boolean partLower = false;
-                    for (int i = 0; i < part.length(); i++) {
-                        final char ch = part.charAt(i);
-                        if (Character.isUpperCase(ch)) partUpper = true;
-                        else if (Character.isLowerCase(ch)) partLower = true;
-                    }
-                    if (partUpper && partLower) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            return true;
-        }
-
-        final String[] parts = word.replace('\u2019', '\'').split("\\'", -1);
-
-        // A normal apostrophe word can be mixed-case as a whole while each segment is
-        // consistently cased (for example Y'all or O'Clock). Do not mistake that for an
-        // intentional mixed-case brand/name; the automatic formatter must normalize each
-        // segment independently. Keep the deliberate contraction-suffix safeguard below.
-        boolean hasMixedSegment = false;
-        for (String part : parts) {
-            boolean partUpper = false;
-            boolean partLower = false;
-            for (int j = 0; j < part.length(); j++) {
-                final char ch = part.charAt(j);
-                if (Character.isUpperCase(ch)) partUpper = true;
-                else if (Character.isLowerCase(ch)) partLower = true;
-            }
-            if (partUpper && partLower) {
-                final boolean titleCasedPart = Character.isUpperCase(part.charAt(0))
-                        && part.substring(1).equals(part.substring(1).toLowerCase(Locale.ROOT));
-                if (!titleCasedPart) {
-                    hasMixedSegment = true;
-                    break;
-                }
-            }
-        }
-        if (!hasMixedSegment) {
-            for (int i = 1; i < parts.length; i++) {
-                final String part = parts[i];
-                if (("s".equalsIgnoreCase(part) || "t".equalsIgnoreCase(part)
-                        || "m".equalsIgnoreCase(part) || "d".equalsIgnoreCase(part)
-                        || "ll".equalsIgnoreCase(part) || "re".equalsIgnoreCase(part)
-                        || "ve".equalsIgnoreCase(part))
-                        && !part.equals(part.toLowerCase(Locale.ROOT))) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        for (int i = 0; i < parts.length; i++) {
-            final String part = parts[i];
-            boolean partUpper = false;
-            boolean partLower = false;
-            for (int j = 0; j < part.length(); j++) {
-                final char ch = part.charAt(j);
-                if (Character.isUpperCase(ch)) partUpper = true;
-                else if (Character.isLowerCase(ch)) partLower = true;
-            }
-            if (partUpper && partLower) {
-                // A normally Title-Cased apostrophe segment (for example "Clock" in
-                // "O'Clock") is not an intentional mixed-case spelling. Preserve only
-                // genuinely mixed internal casing such as "iPhone" or "eBay".
-                final boolean titleCasedPart = Character.isUpperCase(part.charAt(0))
-                        && part.substring(1).equals(part.substring(1).toLowerCase(Locale.ROOT));
-                if (!titleCasedPart) {
-                    return true;
-                }
-            }
-
-            // A contraction suffix is intentionally lowercase. Preserve an uppercase or
-            // mixed-case suffix exactly as typed instead of normalizing "can'T" to "Can't".
-            if (i > 0 && ("s".equalsIgnoreCase(part) || "t".equalsIgnoreCase(part)
-                    || "m".equalsIgnoreCase(part) || "d".equalsIgnoreCase(part)
-                    || "ll".equalsIgnoreCase(part) || "re".equalsIgnoreCase(part)
-                    || "ve".equalsIgnoreCase(part)) && !part.equals(part.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Returns whether the current composing text belongs to a token that begins with a digit.
      * The attached-to-non-word flag is useful for number-leading tokens, but must not leak across
      * a separator. For example, "hello" after "2nd " is a normal word and its selected suggestion
@@ -3077,7 +2961,6 @@ public final class InputLogic {
         // original casing (handled above when the suggestion is the same token) and do not
         // let a dictionary suggestion turn "2nd" into "2Nd" when Space commits the word.
         if (!skipHaamidFormatting && !isNumberLeadingTypedToken
-                && !hasIntentionalMixedCase(chosenWord)
                 && shouldApplyHaamidAutomaticFormatting()) {
             final String formatted = HaamidApostropheOverrides.apply(
                     chosenWord, HaamidFormatter.formatAutomatic(chosenWord));
