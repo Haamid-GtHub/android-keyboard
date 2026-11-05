@@ -104,6 +104,17 @@ jobs:
             exit 1
           }
 
+          # Fail closed if FUTO and Haamid both edited the same file since their common ancestor.
+          # Even a clean line-level merge can introduce behavioural regressions in a shared file.
+          CUSTOM_PATHS="$(git diff --name-only "$BASE" HEAD | sort -u)"
+          UPSTREAM_PATHS="$(git diff --name-only "$BASE" "$UPSTREAM_REF" | sort -u)"
+          OVERLAPPING_PATHS="$(comm -12 <(printf '%s\\n' "$CUSTOM_PATHS") <(printf '%s\\n' "$UPSTREAM_PATHS"))"
+          if [ -n "$OVERLAPPING_PATHS" ]; then
+            echo "::error::FUTO and Haamid changed the same files. Refusing automatic merge to protect custom keyboard features:"
+            printf '%s\\n' "$OVERLAPPING_PATHS"
+            exit 1
+          fi
+
           if ! git diff --quiet "$BASE" "$UPSTREAM_REF" -- java/shared.keystore; then
             echo "::error::FUTO changed the shared signing keystore. Refusing to change the signing identity."
             exit 1
@@ -192,7 +203,23 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort | tail -n 1)"
           "$AAPT" dump badging "$APK" | grep -F "package: name='org.futo.inputmethod.latin'"
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/haamid-signature.txt
-          grep -F "Signer #1 certificate SHA-256 digest:" /tmp/haamid-signature.txt
+          NEW_CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/haamid-signature.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          if [ -z "$NEW_CERT" ]; then
+            echo "::error::Could not read the new APK signing certificate fingerprint."
+            exit 1
+          fi
+
+          # Compare against the last known stable Haamid APK, not merely against the keystore file's existence.
+          mkdir -p /tmp/known-haamid
+          gh release download haamid-stable-manual-1792830017 --repo Haamid-GtHub/android-keyboard \\
+            --pattern HaamidKeyboard.apk --dir /tmp/known-haamid
+          "$APKSIGNER" verify --print-certs /tmp/known-haamid/HaamidKeyboard.apk | tee /tmp/known-haamid-signature.txt
+          KNOWN_CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/known-haamid-signature.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          if [ -z "$KNOWN_CERT" ] || [ "$NEW_CERT" != "$KNOWN_CERT" ]; then
+            echo "::error::The new APK signing certificate does not match the trusted Haamid stable release. Refusing to publish an APK that may not update the installed app."
+            exit 1
+          fi
+          echo "Signing certificate matches the trusted Haamid stable release."
           cp "$APK" HaamidKeyboard.apk
 
       - name: Upload Verified APK Artifact
