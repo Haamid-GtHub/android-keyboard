@@ -27,7 +27,7 @@ jobs:
       - name: Detect New Official Stable FUTO Release
         id: release
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -66,7 +66,7 @@ jobs:
       - name: Repair Release Tracking Marker If A Previous Publish Was Interrupted
         if: steps.release.outputs.repair_marker == 'true'
         env:
-          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+          FUTO_TAG: ${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -82,7 +82,7 @@ jobs:
         if: steps.release.outputs.updated == 'true'
         id: upstream
         env:
-          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+          FUTO_TAG: ${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -94,8 +94,8 @@ jobs:
         if: steps.release.outputs.updated == 'true'
         id: sync
         env:
-          UPSTREAM_REF: \${{ steps.upstream.outputs.ref }}
-          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+          UPSTREAM_REF: ${{ steps.upstream.outputs.ref }}
+          FUTO_TAG: ${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -134,7 +134,7 @@ jobs:
       - name: Set Build Version
         if: steps.release.outputs.updated == 'true'
         env:
-          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+          FUTO_TAG: ${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           VERSION_CODE="$(date -u +%s)"
@@ -199,7 +199,7 @@ jobs:
         if: steps.release.outputs.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: HaamidKeyboard-FUTO-\${{ steps.release.outputs.futo_tag }}
+          name: HaamidKeyboard-FUTO-${{ steps.release.outputs.futo_tag }}
           path: HaamidKeyboard.apk
           if-no-files-found: error
           retention-days: 30
@@ -207,15 +207,15 @@ jobs:
       - name: Publish Verified Haamid Release
         if: steps.release.outputs.updated == 'true'
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FUTO_TAG: ${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ "\${{ steps.test_apk_build.outcome }}" = "success" ] && [ "\${{ steps.regression.outcome }}" = "success" ]; then
+          if [ "${{ steps.test_apk_build.outcome }}" = "success" ] && [ "${{ steps.regression.outcome }}" = "success" ]; then
             TEST_NOTE="Automated Android regression tests passed."
           else
-            TEST_NOTE="WARNING: Automated regression tests could not complete successfully (test APK build: \${{ steps.test_apk_build.outcome }}; emulator tests: \${{ steps.regression.outcome }}). These test failures did not block this release. The stable APK build, package-name check, and signing verification passed. Please install cautiously and report any issue."
+            TEST_NOTE="WARNING: Automated regression tests could not complete successfully (test APK build: ${{ steps.test_apk_build.outcome }}; emulator tests: ${{ steps.regression.outcome }}). These test failures did not block this release. The stable APK build, package-name check, and signing verification passed. Please install cautiously and report any issue."
           fi
 
           HAAMID_TAG="haamid-futo-$FUTO_TAG"
