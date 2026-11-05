@@ -110,8 +110,7 @@ public final class HaamidFormatter {
                         && word.substring(1).equals(word.substring(1).toLowerCase(Locale.ROOT));
                 return !titleCasedPart;
             }
-            }
-    
+
             final String[] parts = word.replace('\u2019', '\'').split("\\'", -1);
     
             // A normal apostrophe word can be mixed-case as a whole while each segment is
