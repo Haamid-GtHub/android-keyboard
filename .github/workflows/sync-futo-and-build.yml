@@ -73,6 +73,8 @@ jobs:
           fi
 
           echo "FUTO commits to integrate: $NEW_COMMITS"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ! git merge --no-edit "$UPSTREAM_REF"; then
             git merge --abort || true
             echo "::error::FUTO changes conflict with Haamid's custom keyboard code. No update was pushed or released."
