@@ -1,0 +1,158 @@
+name: Protected FUTO Sync And Haamid Stable Build
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: protected-futo-sync-haamid
+  cancel-in-progress: false
+
+jobs:
+  sync-test-build-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check Out Haamid Keyboard And Submodules
+        uses: actions/checkout@v4
+        with:
+          ref: haamid-strict-title-case
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Fetch Official FUTO Source
+        id: upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/futo-org/android-keyboard.git
+          git fetch upstream master
+          echo "ref=upstream/master" >> "$GITHUB_OUTPUT"
+
+      - name: Merge FUTO Updates Without Overwriting Custom Code
+        id: sync
+        shell: bash
+        env:
+          UPSTREAM_REF: ${{ steps.upstream.outputs.ref }}
+        run: |
+          set -euo pipefail
+          BASE="$(git merge-base HEAD "$UPSTREAM_REF")" || {
+            echo "::error::No common history with FUTO was found. Nothing was changed."
+            exit 1
+          }
+
+          if ! git diff --quiet "$BASE" "$UPSTREAM_REF" -- java/shared.keystore; then
+            echo "::error::FUTO upstream changed the shared signing keystore. Refusing to change the signing identity."
+            exit 1
+          fi
+
+          NEW_COMMITS="$(git rev-list --count "HEAD..$UPSTREAM_REF")"
+          echo "new_commits=$NEW_COMMITS" >> "$GITHUB_OUTPUT"
+          if [ "$NEW_COMMITS" -eq 0 ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "No new FUTO commits. The existing keyboard is unchanged."
+            exit 0
+          fi
+
+          echo "FUTO commits to integrate: $NEW_COMMITS"
+          if ! git merge --no-edit "$UPSTREAM_REF"; then
+            git merge --abort || true
+            echo "::error::FUTO changes conflict with Haamid's custom keyboard code. No update was pushed or released."
+            exit 1
+          fi
+
+          git diff --check
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Shared Signing Key
+        if: steps.sync.outputs.updated == 'true'
+        run: |
+          set -euo pipefail
+          test -f java/shared.keystore
+          test ! -f keystore.properties
+
+      - name: Set Build Version
+        if: steps.sync.outputs.updated == 'true'
+        shell: bash
+        run: |
+          VERSION_CODE="$(date -u +%s)"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
+
+      - name: Set Up Java
+        if: steps.sync.outputs.updated == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set Up Gradle
+        if: steps.sync.outputs.updated == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile Android Regression Test APK
+        if: steps.sync.outputs.updated == 'true'
+        run: ./gradlew assembleStableDebugAndroidTest --no-daemon --stacktrace
+
+      - name: Run Android Regression Tests
+        if: steps.sync.outputs.updated == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -no-audio -no-metrics -camera-back none -camera-front none
+          disable-animations: true
+          script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
+
+      - name: Build Stable Release APK
+        if: steps.sync.outputs.updated == 'true'
+        run: ./gradlew assembleStableRelease --no-daemon --stacktrace
+
+      - name: Verify Package Name And APK Signature
+        if: steps.sync.outputs.updated == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f -print -quit)"
+          if [ -z "$APK" ]; then
+            echo "::error::Stable release APK was not found."
+            exit 1
+          fi
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort | tail -n 1)"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.futo.inputmethod.latin'"
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/haamid-signature.txt
+          grep -F "Signer #1 certificate SHA-256 digest:" /tmp/haamid-signature.txt
+          cp "$APK" HaamidKeyboard.apk
+
+      - name: Upload Verified APK Artifact
+        if: steps.sync.outputs.updated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: HaamidKeyboard-FUTO-Update-${{ env.VERSION_CODE }}
+          path: HaamidKeyboard.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Save Successfully Tested FUTO Update
+        if: steps.sync.outputs.updated == 'true'
+        run: git push origin HEAD:refs/heads/haamid-strict-title-case
+
+      - name: Publish Verified Haamid Release
+        if: steps.sync.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="haamid-futo-update-$VERSION_CODE"
+          gh release create "$TAG" HaamidKeyboard.apk \
+            --title "Haamid Keyboard — FUTO Update $VERSION_CODE" \
+            --notes "FUTO source was merged without forced conflict resolution. Android regression tests passed, the stable APK build succeeded, the package name was verified, and the APK signature was verified using the repository's existing shared signing key. Package: org.futo.inputmethod.latin. This release does not install itself; download and install it to update HaamidKeyboard."
