@@ -89,6 +89,20 @@ jobs:
         if: steps.sync.outputs.updated == 'true'
         run: git submodule update --init --recursive
 
+      - name: Protect Haamid Formatter Files And Android 7.1.1 Support
+        if: steps.sync.outputs.updated == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f java/src/org/futo/inputmethod/latin/HaamidFormatter.java
+          test -f java/src/org/futo/inputmethod/latin/HaamidApostropheOverrides.java
+          test -f java/src/org/futo/inputmethod/latin/HaamidFormattingSettings.java
+          test -f tests/src/org/futo/inputmethod/latin/HaamidFormatterTests.java
+          if ! grep -Eq 'minSdk[[:space:]]+(24|25)([[:space:]]|$)' build.gradle; then
+            echo "::error::The merged source no longer guarantees compatibility with Android 7.1.1 (API 25). No update will be published."
+            exit 1
+          fi
+
       - name: Verify Shared Signing Key
         if: steps.sync.outputs.updated == 'true'
         run: |
