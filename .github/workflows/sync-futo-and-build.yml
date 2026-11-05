@@ -1,4 +1,4 @@
-name: Protected FUTO Sync And Haamid Stable Build
+name: Protected FUTO Stable-Release Sync And Haamid Build
 
 on:
   schedule:
@@ -24,105 +24,144 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Fetch Official FUTO Source
-        id: upstream
+      - name: Detect New Official Stable FUTO Release
+        id: release
+        env:
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          git remote add upstream https://gitlab.futo.org/keyboard/latinime.git
-          if git fetch upstream master; then
-            echo "ref=upstream/master" >> "$GITHUB_OUTPUT"
-          elif git fetch upstream main; then
-            echo "ref=upstream/main" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::FUTO GitLab source could not be fetched; falling back to the public GitHub mirror."
-            git remote add futo-mirror https://github.com/futo-org/android-keyboard.git
-            if git fetch futo-mirror master; then
-              echo "ref=futo-mirror/master" >> "$GITHUB_OUTPUT"
-            elif git fetch futo-mirror main; then
-              echo "ref=futo-mirror/main" >> "$GITHUB_OUTPUT"
-            else
-              echo "::error::Could not fetch FUTO source from GitLab or GitHub. No update was made."
-              exit 1
-            fi
+          FUTO_TAG="$(gh api repos/futo-org/android-keyboard/releases/latest --jq '.tag_name')"
+          if [ -z "$FUTO_TAG" ]; then
+            echo "::error::FUTO's latest stable release tag could not be read. No update was made."
+            exit 1
           fi
 
-      - name: Merge FUTO Updates Without Overwriting Custom Code
-        id: sync
-        shell: bash
+          LAST_TAG="0.1.30"
+          if [ -f .github/futo-last-stable-release ]; then
+            LAST_TAG="$(tr -d '[:space:]' < .github/futo-last-stable-release)"
+          fi
+
+          echo "FUTO latest stable release: $FUTO_TAG"
+          echo "Last successfully published FUTO release: $LAST_TAG"
+          echo "futo_tag=$FUTO_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ "$FUTO_TAG" = "$LAST_TAG" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "No new official stable FUTO release. No build will run."
+            exit 0
+          fi
+
+          HAAMID_TAG="haamid-futo-$FUTO_TAG"
+          if gh release view "$HAAMID_TAG" >/dev/null 2>&1; then
+            echo "repair_marker=true" >> "$GITHUB_OUTPUT"
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "This FUTO version already has a Haamid release. Only the tracking marker needs repair."
+            exit 0
+          fi
+
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+          echo "repair_marker=false" >> "$GITHUB_OUTPUT"
+
+      - name: Repair Release Tracking Marker If A Previous Publish Was Interrupted
+        if: steps.release.outputs.repair_marker == 'true'
         env:
-          UPSTREAM_REF: ${{ steps.upstream.outputs.ref }}
+          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github
+          printf '%s\n' "$FUTO_TAG" > .github/futo-last-stable-release
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/futo-last-stable-release
+          git commit -m "Record successfully published FUTO release $FUTO_TAG"
+          git push origin HEAD:refs/heads/haamid-strict-title-case
+
+      - name: Fetch Exact FUTO Stable Release Source
+        if: steps.release.outputs.updated == 'true'
+        id: upstream
+        env:
+          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add futo-mirror https://github.com/futo-org/android-keyboard.git
+          git fetch --no-tags futo-mirror "refs/tags/$FUTO_TAG:refs/tags/futo-$FUTO_TAG"
+          echo "ref=refs/tags/futo-$FUTO_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Merge FUTO Release Without Overwriting Custom Code
+        if: steps.release.outputs.updated == 'true'
+        id: sync
+        env:
+          UPSTREAM_REF: \${{ steps.upstream.outputs.ref }}
+          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
+        shell: bash
         run: |
           set -euo pipefail
           BASE="$(git merge-base HEAD "$UPSTREAM_REF")" || {
-            echo "::error::No common history with FUTO was found. Nothing was changed."
+            echo "::error::No common history with the official FUTO release was found. Nothing was changed."
             exit 1
           }
 
           if ! git diff --quiet "$BASE" "$UPSTREAM_REF" -- java/shared.keystore; then
-            echo "::error::FUTO upstream changed the shared signing keystore. Refusing to change the signing identity."
+            echo "::error::FUTO changed the shared signing keystore. Refusing to change the signing identity."
             exit 1
           fi
 
-          NEW_COMMITS="$(git rev-list --count "HEAD..$UPSTREAM_REF")"
-          echo "new_commits=$NEW_COMMITS" >> "$GITHUB_OUTPUT"
-          if [ "$NEW_COMMITS" -eq 0 ]; then
-            echo "updated=false" >> "$GITHUB_OUTPUT"
-            echo "No new FUTO commits. The existing keyboard is unchanged."
-            exit 0
-          fi
-
-          echo "FUTO commits to integrate: $NEW_COMMITS"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ! git merge --no-edit "$UPSTREAM_REF"; then
             git merge --abort || true
-            echo "::error::FUTO changes conflict with Haamid's custom keyboard code. No update was pushed or released."
+            echo "::error::FUTO release changes conflict with Haamid's custom keyboard code. No update was pushed or released."
             exit 1
           fi
 
           git diff --check
-          echo "updated=true" >> "$GITHUB_OUTPUT"
+          echo "Integrated official FUTO stable release $FUTO_TAG."
 
-      - name: Refresh FUTO Submodules At The Merged Revisions
-        if: steps.sync.outputs.updated == 'true'
+      - name: Refresh FUTO Submodules At The Release Revisions
+        if: steps.release.outputs.updated == 'true'
         run: git submodule update --init --recursive
 
-      - name: Verify Shared Signing Key
-        if: steps.sync.outputs.updated == 'true'
+      - name: Verify Shared Signing Key Is Preserved
+        if: steps.release.outputs.updated == 'true'
         run: |
           set -euo pipefail
           test -f java/shared.keystore
           test ! -f keystore.properties
 
       - name: Set Build Version
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
+        env:
+          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           VERSION_CODE="$(date -u +%s)"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
-          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$FUTO_TAG-haamid" >> "$GITHUB_ENV"
+          echo "FUTO_TAG=$FUTO_TAG" >> "$GITHUB_ENV"
           echo "BRANCH_NAME=haamid-strict-title-case" >> "$GITHUB_ENV"
 
       - name: Set Up Java
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set Up Gradle
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         uses: gradle/actions/setup-gradle@v4
 
       - name: Compile Android Regression Test APK (Non-Blocking)
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         id: test_apk_build
         continue-on-error: true
         run: ./gradlew assembleStableDebugAndroidTest --no-daemon --stacktrace
 
       - name: Run Android Regression Tests (Non-Blocking)
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         id: regression
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
@@ -136,11 +175,11 @@ jobs:
           script: ./gradlew connectedStableDebugAndroidTest --no-daemon --stacktrace
 
       - name: Build Stable Release APK
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         run: ./gradlew assembleStableRelease --no-daemon --stacktrace
 
       - name: Verify Package Name And APK Signature
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -157,31 +196,35 @@ jobs:
           cp "$APK" HaamidKeyboard.apk
 
       - name: Upload Verified APK Artifact
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: HaamidKeyboard-FUTO-Update-${{ env.VERSION_CODE }}
+          name: HaamidKeyboard-FUTO-\${{ steps.release.outputs.futo_tag }}
           path: HaamidKeyboard.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Save Successfully Tested FUTO Update
-        if: steps.sync.outputs.updated == 'true'
-        run: git push origin HEAD:refs/heads/haamid-strict-title-case
-
       - name: Publish Verified Haamid Release
-        if: steps.sync.outputs.updated == 'true'
+        if: steps.release.outputs.updated == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          FUTO_TAG: \${{ steps.release.outputs.futo_tag }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG="haamid-futo-update-$VERSION_CODE"
-          if [ "${{ steps.test_apk_build.outcome }}" = "success" ] && [ "${{ steps.regression.outcome }}" = "success" ]; then
+          if [ "\${{ steps.test_apk_build.outcome }}" = "success" ] && [ "\${{ steps.regression.outcome }}" = "success" ]; then
             TEST_NOTE="Automated Android regression tests passed."
           else
-            TEST_NOTE="WARNING: Automated regression tests could not complete successfully (test APK build: ${{ steps.test_apk_build.outcome }}; emulator tests: ${{ steps.regression.outcome }}). These test failures did not block this release. The stable APK build, package-name check, and signing verification all passed. Please install cautiously and report any issue."
+            TEST_NOTE="WARNING: Automated regression tests could not complete successfully (test APK build: \${{ steps.test_apk_build.outcome }}; emulator tests: \${{ steps.regression.outcome }}). These test failures did not block this release. The stable APK build, package-name check, and signing verification passed. Please install cautiously and report any issue."
           fi
-          gh release create "$TAG" HaamidKeyboard.apk \
-            --title "Haamid Keyboard — FUTO Update $VERSION_CODE" \
-            --notes "FUTO source was merged without forced conflict resolution. $TEST_NOTE Stable APK build succeeded; package name and APK signature were verified using the repository's existing shared signing key. Package: org.futo.inputmethod.latin. This release does not install itself; download and install it to update HaamidKeyboard."
+
+          HAAMID_TAG="haamid-futo-$FUTO_TAG"
+          gh release create "$HAAMID_TAG" HaamidKeyboard.apk \
+            --target HEAD \
+            --title "Haamid Keyboard — FUTO $FUTO_TAG" \
+            --notes "Based on FUTO's official stable app release $FUTO_TAG. FUTO changes were merged without forced conflict resolution. The existing shared signing keystore was preserved. $TEST_NOTE Package: org.futo.inputmethod.latin. Download and install this APK manually to update Haamid Keyboard."
+
+          printf '%s\n' "$FUTO_TAG" > .github/futo-last-stable-release
+          git add .github/futo-last-stable-release
+          git commit -m "Record successfully published FUTO release $FUTO_TAG"
+          git push origin HEAD:refs/heads/haamid-strict-title-case
