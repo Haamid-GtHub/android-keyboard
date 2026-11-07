@@ -42,6 +42,13 @@ jobs:
       - name: Verify Shared Signing Key Is Present
         run: test -f java/shared.keystore && test ! -f keystore.properties
 
+      - name: Set Build Version
+        shell: bash
+        run: |
+          VERSION_CODE="$(date +%s)"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=0.0.$VERSION_CODE" >> "$GITHUB_ENV"
+
       - name: Build Signed Stable Release APK
         run: ./gradlew assembleStableRelease --no-daemon --stacktrace
 
