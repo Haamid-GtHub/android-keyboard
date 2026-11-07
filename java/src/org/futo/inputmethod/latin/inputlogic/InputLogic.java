@@ -138,6 +138,7 @@ public final class InputLogic {
     private int mHaamidCursorEditedWordStart = -1;
     private int mHaamidCursorEditedWordEnd = -1;
     private boolean mHaamidCursorEditedWordShouldPreserveCase;
+    private String mHaamidCursorEditedWordOriginalText;
     // The exact word restored by Backspace after automatic Title Case; used to distinguish
     // an unchanged word (which may be formatted again) from a deliberate edit.
     private String mHaamidWordRestoredByUndo;
@@ -3192,6 +3193,7 @@ public final class InputLogic {
         mHaamidCursorEditedWordStart = -1;
         mHaamidCursorEditedWordEnd = -1;
         mHaamidCursorEditedWordShouldPreserveCase = false;
+        mHaamidCursorEditedWordOriginalText = null;
     }
 
     /**
@@ -3219,6 +3221,7 @@ public final class InputLogic {
                     mConnection.getExpectedSelectionStart(),
                     mConnection.getExpectedSelectionEnd());
             final String selectedText = selected.toString();
+            mHaamidCursorEditedWordOriginalText = selectedText;
             mHaamidCursorEditedWordShouldPreserveCase =
                     HaamidFormatter.formatAutomatic(selectedText).equals(selectedText);
             return;
@@ -3241,6 +3244,7 @@ public final class InputLogic {
         // after the user changes its letters. A different word starts a new edit session.
         if (mHaamidCursorEditedWordStart != wordStart) {
             final String originalWord = range.mWord.toString();
+            mHaamidCursorEditedWordOriginalText = originalWord;
             mHaamidCursorEditedWordShouldPreserveCase =
                     HaamidFormatter.formatAutomatic(originalWord).equals(originalWord);
         }
@@ -3269,9 +3273,11 @@ public final class InputLogic {
         final int cursor = mConnection.getExpectedSelectionStart();
         final int currentWordStart;
         final int currentWordEnd;
+        final String currentWordText;
         if (range != null && !TextUtils.isEmpty(range.mWord)) {
             currentWordStart = cursor - range.getNumberOfCharsInWordBeforeCursor();
             currentWordEnd = cursor + range.getNumberOfCharsInWordAfterCursor();
+            currentWordText = range.mWord.toString();
         } else {
             // Some editors expose only the composing fragment through the cursor query.
             // Fall back to the active composing text so edits within the tracked word still match.
@@ -3282,13 +3288,19 @@ public final class InputLogic {
             }
             currentWordStart = cursor - composingWord.length();
             currentWordEnd = cursor;
+            currentWordText = composingWord;
         }
 
+        // Cursor movement alone is not an edit. Protect the word only if the text at
+        // the original word position has actually changed. Requiring the same start
+        // position prevents an adjacent/new word from inheriting this protection.
         final boolean sameEditedWord =
-                currentWordStart < mHaamidCursorEditedWordEnd
+                currentWordStart == mHaamidCursorEditedWordStart
+                        && currentWordStart < mHaamidCursorEditedWordEnd
                         && currentWordEnd > mHaamidCursorEditedWordStart;
-        final boolean shouldPreserveCase =
-                sameEditedWord && mHaamidCursorEditedWordShouldPreserveCase;
+        final boolean wordWasActuallyEdited =
+                !TextUtils.equals(currentWordText, mHaamidCursorEditedWordOriginalText);
+        final boolean shouldPreserveCase = sameEditedWord && wordWasActuallyEdited;
         clearHaamidCursorEditTracking();
         return shouldPreserveCase;
     }
