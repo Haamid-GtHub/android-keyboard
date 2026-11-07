@@ -1,0 +1,65 @@
+name: Build Haamid Editing Protection Fix
+
+on:
+  push:
+    branches:
+      - haamid-editing-protection-fix-20261107
+    paths:
+      - '.github/workflows/build-editing-protection-fix.yml'
+      - '**/*.java'
+      - '**/*.kt'
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradle.properties'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check Out Exact Fix Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set Up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify Shared Signing Key Is Present
+        run: test -f java/shared.keystore && test ! -f keystore.properties
+
+      - name: Build Signed Stable Release APK
+        run: ./gradlew assembleStableRelease --no-daemon --stacktrace
+
+      - name: Verify APK Package And Signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find . -path '*/build/outputs/apk/stable/release/*.apk' -type f -print -quit)"
+          test -n "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort | tail -n 1)"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.futo.inputmethod.latin'"
+          "$APKSIGNER" verify --print-certs "$APK"
+
+      - name: Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: haamid-editing-protection-fix-signed-apk
+          path: '**/build/outputs/apk/stable/release/*.apk'
+          if-no-files-found: error
+          retention-days: 14
