@@ -132,9 +132,8 @@ public final class InputLogic {
     // TODO: This boolean is persistent state and causes large side effects at unexpected times.
     // Find a way to remove it for readability.
     private boolean mIsAutoCorrectionIndicatorOn;
-    // One-shot protection for edits made through Backspace/undo on the active composing word.
-    // Cursor-based edits are tracked by their text range separately, so protection cannot leak
-    // from an edited word into the next newly typed word.
+    // One-shot protection for a word restored by Backspace/undo. Cursor-based edits are tracked
+    // by their text range separately, so protection cannot leak into the next newly typed word.
     private boolean mHaamidSkipNextAutomaticFormatting;
     private int mHaamidCursorEditedWordStart = -1;
     private int mHaamidCursorEditedWordEnd = -1;
@@ -603,7 +602,8 @@ public final class InputLogic {
         }
 
         // A real editor cursor move with no active composing span usually means the
-        // user tapped into existing text to edit it. Preserve their next capitalization.
+        // user tapped into existing text to edit it. Track that specific word so its
+        // protection cannot suppress formatting on a later, unrelated word.
         if ((oldSelStart != newSelStart || oldSelEnd != newSelEnd)
                 && composingStart < 0 && composingEnd < 0) {
             rememberHaamidCursorEditIfInsideWord();
