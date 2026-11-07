@@ -1510,9 +1510,10 @@ public final class InputLogic {
                 && inputTransaction.mSettingsValues.mBackspaceModeHold == Settings.BACKSPACE_MODE_WORDS;
 
         if (mWordComposer.isComposingWord() && !mConnection.hasSelection()) {
-            // Backspace means the user is editing this word intentionally. Do not
-            // reapply automatic Title Case when the edited word is committed.
-            mHaamidSkipNextAutomaticFormatting = true;
+            // Cursor-based edits are protected by their tracked word range. Do not set the
+            // global one-shot marker here: the composing word may be abandoned when the user
+            // moves the cursor away, and that marker would then suppress the next new word.
+            // A normal unformatted composing word should still receive Title Case on Space.
             mHaamidWordRestoredByUndo = null;
             if (mWordComposer.isBatchMode()) {
                 final String rejectedSuggestion = mWordComposer.getTypedWord();
