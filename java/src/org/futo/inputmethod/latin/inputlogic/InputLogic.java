@@ -1543,6 +1543,7 @@ public final class InputLogic {
                 // input and should not inherit this word's formatting-skip marker.
                 mHaamidSkipNextAutomaticFormatting = false;
                 mHaamidWordRestoredByUndo = null;
+                clearHaamidCursorEditTracking();
             }
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
@@ -1771,11 +1772,11 @@ public final class InputLogic {
 
             // Do not carry the intentional-edit marker into a new word if Backspace
             // removed the entire word (or selection) rather than editing within it.
-            if (mHaamidSkipNextAutomaticFormatting
-                    && !isHaamidWordCharacter(mConnection.getTextBeforeCursor(1, 0))
+            if (!isHaamidWordCharacter(mConnection.getTextBeforeCursor(1, 0))
                     && !isHaamidWordCharacter(mConnection.getTextAfterCursor(1, 0))) {
                 mHaamidSkipNextAutomaticFormatting = false;
                 mHaamidWordRestoredByUndo = null;
+                clearHaamidCursorEditTracking();
             }
         }
     }
