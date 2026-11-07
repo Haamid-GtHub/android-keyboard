@@ -3285,8 +3285,8 @@ public final class InputLogic {
         }
 
         final boolean sameEditedWord =
-                currentWordStart <= mHaamidCursorEditedWordEnd
-                        && currentWordEnd >= mHaamidCursorEditedWordStart;
+                currentWordStart < mHaamidCursorEditedWordEnd
+                        && currentWordEnd > mHaamidCursorEditedWordStart;
         final boolean shouldPreserveCase =
                 sameEditedWord && mHaamidCursorEditedWordShouldPreserveCase;
         clearHaamidCursorEditTracking();
