@@ -132,8 +132,13 @@ public final class InputLogic {
     // TODO: This boolean is persistent state and causes large side effects at unexpected times.
     // Find a way to remove it for readability.
     private boolean mIsAutoCorrectionIndicatorOn;
-    // Preserve deliberate edits when the user moves the cursor into existing text.
+    // One-shot protection for edits made through Backspace/undo on the active composing word.
+    // Cursor-based edits are tracked by their text range separately, so protection cannot leak
+    // from an edited word into the next newly typed word.
     private boolean mHaamidSkipNextAutomaticFormatting;
+    private int mHaamidCursorEditedWordStart = -1;
+    private int mHaamidCursorEditedWordEnd = -1;
+    private boolean mHaamidCursorEditedWordShouldPreserveCase;
     // The exact word restored by Backspace after automatic Title Case; used to distinguish
     // an unchanged word (which may be formatted again) from a deliberate edit.
     private String mHaamidWordRestoredByUndo;
@@ -247,6 +252,7 @@ public final class InputLogic {
         mWordBeingCorrectedByCursor = null;
         // Do not carry a pending Title Case undo/edit marker into another editor.
         mHaamidSkipNextAutomaticFormatting = false;
+        clearHaamidCursorEditTracking();
         mHaamidWordRestoredByUndo = null;
         mHaamidFormattingCommitCreatedThisEvent = false;
         numCursorUpdatesSinceInputStarted = 0;
@@ -339,6 +345,7 @@ public final class InputLogic {
     public void finishInput() {
         rememberCommittedEmail();
         resetInput();
+        clearHaamidCursorEditTracking();
         clearRememberedSuggestedWords();
     }
 
@@ -2958,7 +2965,10 @@ public final class InputLogic {
                 && (!mHaamidWordRestoredByUndo.equals(typedWordForTracking)
                         || (isManualSuggestionPick
                                 && !mHaamidWordRestoredByUndo.equals(chosenWord)));
+        final boolean skipCursorEditedWordFormatting =
+                consumeHaamidCursorEditProtection(settingsValues);
         final boolean skipHaamidFormatting = wordChangedAfterHaamidUndo
+                || skipCursorEditedWordFormatting
                 || (mHaamidSkipNextAutomaticFormatting
                         && (!isManualSuggestionPick || mHaamidWordRestoredByUndo != null));
         mHaamidSkipNextAutomaticFormatting = false;
@@ -3176,18 +3186,109 @@ public final class InputLogic {
     }
 
 
+    private void clearHaamidCursorEditTracking() {
+        mHaamidCursorEditedWordStart = -1;
+        mHaamidCursorEditedWordEnd = -1;
+        mHaamidCursorEditedWordShouldPreserveCase = false;
+    }
+
+    /**
+     * Remember the exact word (or selected range) being edited. The original casing determines
+     * whether a completed edit should be protected: an already formatted/mixed-case word keeps
+     * the user's deliberate casing, while an unformatted lowercase word can still receive Title
+     * Case when the user presses Space to finish it.
+     */
     private void rememberHaamidCursorEditIfInsideWord() {
         if (!HaamidFormattingSettings.isAutomaticFormattingEnabled()) {
+            clearHaamidCursorEditTracking();
             return;
         }
+
         if (mConnection.hasSelection()) {
-            mHaamidSkipNextAutomaticFormatting = true;
+            final CharSequence selected = mConnection.getSelectedText(0);
+            if (TextUtils.isEmpty(selected)) {
+                clearHaamidCursorEditTracking();
+                return;
+            }
+            mHaamidCursorEditedWordStart = Math.min(
+                    mConnection.getExpectedSelectionStart(),
+                    mConnection.getExpectedSelectionEnd());
+            mHaamidCursorEditedWordEnd = Math.max(
+                    mConnection.getExpectedSelectionStart(),
+                    mConnection.getExpectedSelectionEnd());
+            final String selectedText = selected.toString();
+            mHaamidCursorEditedWordShouldPreserveCase =
+                    HaamidFormatter.formatAutomatic(selectedText).equals(selectedText);
             return;
         }
-        final CharSequence before = mConnection.getTextBeforeCursor(1, 0);
-        final CharSequence after = mConnection.getTextAfterCursor(1, 0);
-        mHaamidSkipNextAutomaticFormatting =
-                isHaamidWordCharacter(before) || isHaamidWordCharacter(after);
+
+        final TextRange range = mConnection.getWordRangeAtCursor(
+                Settings.getInstance().getCurrent(),
+                mImeHelper.getCurrentKeyboardScriptId(),
+                true);
+        if (range == null || TextUtils.isEmpty(range.mWord)) {
+            clearHaamidCursorEditTracking();
+            return;
+        }
+
+        final int cursor = mConnection.getExpectedSelectionStart();
+        final int wordStart = cursor - range.getNumberOfCharsInWordBeforeCursor();
+        final int wordEnd = cursor + range.getNumberOfCharsInWordAfterCursor();
+
+        // Keep the original casing decision while the cursor remains in the same word, even
+        // after the user changes its letters. A different word starts a new edit session.
+        if (mHaamidCursorEditedWordStart != wordStart) {
+            final String originalWord = range.mWord.toString();
+            mHaamidCursorEditedWordShouldPreserveCase =
+                    HaamidFormatter.formatAutomatic(originalWord).equals(originalWord);
+        }
+        mHaamidCursorEditedWordStart = wordStart;
+        mHaamidCursorEditedWordEnd = wordEnd;
+    }
+
+    /**
+     * Consume cursor-edit protection only when the word currently being committed overlaps the
+     * range that was actually edited. A later, unrelated word must never inherit that protection.
+     */
+    private boolean consumeHaamidCursorEditProtection(final SettingsValues settingsValues) {
+        if (mHaamidCursorEditedWordStart < 0) {
+            return false;
+        }
+
+        // Batch/voice input has its own established commit path. Clear any stale manual-edit
+        // context without changing how batch input is formatted.
+        if (mWordComposer.isBatchMode()) {
+            clearHaamidCursorEditTracking();
+            return false;
+        }
+
+        final TextRange range = mConnection.getWordRangeAtCursor(
+                settingsValues, mImeHelper.getCurrentKeyboardScriptId(), true);
+        final int cursor = mConnection.getExpectedSelectionStart();
+        final int currentWordStart;
+        final int currentWordEnd;
+        if (range != null && !TextUtils.isEmpty(range.mWord)) {
+            currentWordStart = cursor - range.getNumberOfCharsInWordBeforeCursor();
+            currentWordEnd = cursor + range.getNumberOfCharsInWordAfterCursor();
+        } else {
+            // Some editors expose only the composing fragment through the cursor query.
+            // Fall back to the active composing text so edits within the tracked word still match.
+            final String composingWord = mWordComposer.getTypedWord();
+            if (TextUtils.isEmpty(composingWord)) {
+                clearHaamidCursorEditTracking();
+                return false;
+            }
+            currentWordStart = cursor - composingWord.length();
+            currentWordEnd = cursor;
+        }
+
+        final boolean sameEditedWord =
+                currentWordStart <= mHaamidCursorEditedWordEnd
+                        && currentWordEnd >= mHaamidCursorEditedWordStart;
+        final boolean shouldPreserveCase =
+                sameEditedWord && mHaamidCursorEditedWordShouldPreserveCase;
+        clearHaamidCursorEditTracking();
+        return shouldPreserveCase;
     }
 
     private boolean isHaamidWordCharacter(final CharSequence text) {
