@@ -137,7 +137,6 @@ public final class InputLogic {
     private boolean mHaamidSkipNextAutomaticFormatting;
     private int mHaamidCursorEditedWordStart = -1;
     private int mHaamidCursorEditedWordEnd = -1;
-    private boolean mHaamidCursorEditedWordShouldPreserveCase;
     private String mHaamidCursorEditedWordOriginalText;
     // The exact word restored by Backspace after automatic Title Case; used to distinguish
     // an unchanged word (which may be formatted again) from a deliberate edit.
@@ -3192,7 +3191,6 @@ public final class InputLogic {
     private void clearHaamidCursorEditTracking() {
         mHaamidCursorEditedWordStart = -1;
         mHaamidCursorEditedWordEnd = -1;
-        mHaamidCursorEditedWordShouldPreserveCase = false;
         mHaamidCursorEditedWordOriginalText = null;
     }
 
@@ -3222,8 +3220,6 @@ public final class InputLogic {
                     mConnection.getExpectedSelectionEnd());
             final String selectedText = selected.toString();
             mHaamidCursorEditedWordOriginalText = selectedText;
-            mHaamidCursorEditedWordShouldPreserveCase =
-                    HaamidFormatter.formatAutomatic(selectedText).equals(selectedText);
             return;
         }
 
@@ -3245,8 +3241,6 @@ public final class InputLogic {
         if (mHaamidCursorEditedWordStart != wordStart) {
             final String originalWord = range.mWord.toString();
             mHaamidCursorEditedWordOriginalText = originalWord;
-            mHaamidCursorEditedWordShouldPreserveCase =
-                    HaamidFormatter.formatAutomatic(originalWord).equals(originalWord);
         }
         mHaamidCursorEditedWordStart = wordStart;
         mHaamidCursorEditedWordEnd = wordEnd;
