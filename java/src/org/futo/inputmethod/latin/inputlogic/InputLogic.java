@@ -1594,22 +1594,6 @@ public final class InputLogic {
                     mHaamidWordRestoredByUndo = lastComposedWord != null
                             ? lastComposedWord.toString() : "";
                 }
-                if (shouldRecomposeForTitleCaseUndo) {
-                    // revertCommit correctly restores the exact original typed spelling.
-                    // Put that same text back into composition so the next Space can run
-                    // the normal Title Case commit path without reapplying autocorrection.
-                    final int[] originalCodePoints =
-                            StringUtils.toCodePointArray(lastComposedWord.toString());
-                    mConnection.beginBatchEdit();
-                    mConnection.deleteTextBeforeCursor(lastComposedWord.length());
-                    mWordComposer.setComposingWord(originalCodePoints,
-                            mImeHelper.getCodepointCoordinates(originalCodePoints));
-                    setComposingTextInternal(getTextWithUnderline(lastComposedWord.toString()), 1);
-                    mConnection.endBatchEdit();
-                    // The restored word is now being composed, not sitting before a phantom
-                    // separator. A following character may extend it; Space will commit it.
-                    mSpaceState = SpaceState.NONE;
-                }
                 StatsUtils.onRevertAutoCorrect(mImeHelper.getContext(), lastComposedWord);
                 StatsUtils.onWordCommitUserTyped(lastComposedWord, mWordComposer.isBatchMode());
                 // Restart suggestions when backspacing into a reverted word. This is required for
@@ -1628,6 +1612,23 @@ public final class InputLogic {
                             inputTransaction,
                             false /* forStartInput */, currentKeyboardScriptId);
                     mSpaceState = spaceState;
+                }
+                if (shouldRecomposeForTitleCaseUndo) {
+                    // Suggestions restart may already have resumed composition on the restored
+                    // word. If not (for example, suggestions are disabled), resume it here.
+                    if (!mWordComposer.isComposingWord()) {
+                        final int[] originalCodePoints =
+                                StringUtils.toCodePointArray(lastComposedWord.toString());
+                        mConnection.beginBatchEdit();
+                        mConnection.deleteTextBeforeCursor(lastComposedWord.length());
+                        mWordComposer.setComposingWord(originalCodePoints,
+                                mImeHelper.getCodepointCoordinates(originalCodePoints));
+                        setComposingTextInternal(
+                                getTextWithUnderline(lastComposedWord.toString()), 1);
+                        mConnection.endBatchEdit();
+                    }
+                    // The restored word is being composed, not left before a phantom separator.
+                    mSpaceState = SpaceState.NONE;
                 }
                 return;
             }
