@@ -1171,12 +1171,9 @@ public final class InputLogic {
     private void handleNonSeparatorEvent(final Event event, final SettingsValues settingsValues,
             final InputTransaction inputTransaction) {
         final int codePoint = event.mCodePoint;
-        // If the user continues typing after undoing autocorrection, this is now an
-        // intentional edit of the restored word. Let the normal correction/formatting
-        // decision run for the changed text instead of treating it as the untouched undo.
-        if (mHaamidWordRestoredByUndo != null) {
-            mHaamidWordRestoredByUndo = null;
-        }
+        // Keep the restored-word marker while the user edits. At the next word
+        // boundary, commitChosenWord compares the edited text with the original: unchanged
+        // text receives Title Case, while deliberate edits retain the user's exact casing.
         // TODO: refactor this method to stop flipping isComposingWord around all the time, and
         // make it shorter (possibly cut into several pieces). Also factor
         // handleNonSpecialCharacterEvent which has the same name as other handle* methods but is
@@ -1293,11 +1290,10 @@ public final class InputLogic {
         }
         // isComposingWord() may have changed since we stored wasComposing
         if (mWordComposer.isComposingWord()) {
-            final boolean isUntouchedHaamidUndoWord = mHaamidWordRestoredByUndo != null
-                    && mHaamidWordRestoredByUndo.equals(mWordComposer.getTypedWord());
-            if (isUntouchedHaamidUndoWord) {
-                // The user explicitly undid this correction. Commit the restored original
-                // spelling (with Title Case) rather than immediately correcting it again.
+            if (mHaamidWordRestoredByUndo != null) {
+                // Once autocorrection has been explicitly undone, do not replace either the
+                // untouched original or the user's subsequent edits with another suggestion.
+                // commitChosenWord applies Title Case only if the restored text is unchanged.
                 commitTyped(settingsValues,
                         StringUtils.newSingleCodePointString(codePoint));
             } else if (settingsValues.mAutoCorrectionEnabledPerUserSettings
