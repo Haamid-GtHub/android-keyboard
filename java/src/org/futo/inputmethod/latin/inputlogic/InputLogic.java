@@ -1569,11 +1569,16 @@ public final class InputLogic {
                     && mLastComposedWord.mCommittedWord != null
                     && !mLastComposedWord.mTypedWord.equalsIgnoreCase(
                             mLastComposedWord.mCommittedWord.toString()));
-            if (mLastComposedWord.isHaamidFormattingApplied()
-                    && !isLexicalAutoCorrection) {
-                // A formatter-only commit still uses the existing one-character undo path.
-                mHaamidSkipNextAutomaticFormatting = true;
-                mHaamidWordRestoredByUndo = null;
+            if (mLastComposedWord.isHaamidFormattingApplied()) {
+                if (isLexicalAutoCorrection) {
+                    // Do not carry a stale formatter-skip marker into a genuine correction undo.
+                    mHaamidSkipNextAutomaticFormatting = false;
+                    mHaamidWordRestoredByUndo = null;
+                } else {
+                    // A formatter-only commit still uses the existing one-character undo path.
+                    mHaamidSkipNextAutomaticFormatting = true;
+                    mHaamidWordRestoredByUndo = null;
+                }
             }
             if (mLastComposedWord.canRevertCommit()
                     && !mLastComposedWord.isManualSuggestionPick()
@@ -1588,6 +1593,7 @@ public final class InputLogic {
                         && Constants.STRING_SPACE.equals(mLastComposedWord.mSeparatorString)
                         && inputTransaction.mSettingsValues.mSpacingAndPunctuations
                                 .currentLanguageHasSpaces
+                        && !mInputLogicHandler.isInBatchInput()
                         && !TextUtils.isEmpty(lastComposedWord);
                 revertCommit(inputTransaction, inputTransaction.mSettingsValues);
                 if (wasHaamidFormattingApplied) {
