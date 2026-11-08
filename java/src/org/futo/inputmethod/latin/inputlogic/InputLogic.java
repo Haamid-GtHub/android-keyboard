@@ -1171,6 +1171,12 @@ public final class InputLogic {
     private void handleNonSeparatorEvent(final Event event, final SettingsValues settingsValues,
             final InputTransaction inputTransaction) {
         final int codePoint = event.mCodePoint;
+        // If the user continues typing after undoing autocorrection, this is now an
+        // intentional edit of the restored word. Let the normal correction/formatting
+        // decision run for the changed text instead of treating it as the untouched undo.
+        if (mHaamidWordRestoredByUndo != null) {
+            mHaamidWordRestoredByUndo = null;
+        }
         // TODO: refactor this method to stop flipping isComposingWord around all the time, and
         // make it shorter (possibly cut into several pieces). Also factor
         // handleNonSpecialCharacterEvent which has the same name as other handle* methods but is
@@ -1287,7 +1293,14 @@ public final class InputLogic {
         }
         // isComposingWord() may have changed since we stored wasComposing
         if (mWordComposer.isComposingWord()) {
-            if (settingsValues.mAutoCorrectionEnabledPerUserSettings
+            final boolean isUntouchedHaamidUndoWord = mHaamidWordRestoredByUndo != null
+                    && mHaamidWordRestoredByUndo.equals(mWordComposer.getTypedWord());
+            if (isUntouchedHaamidUndoWord) {
+                // The user explicitly undid this correction. Commit the restored original
+                // spelling (with Title Case) rather than immediately correcting it again.
+                commitTyped(settingsValues,
+                        StringUtils.newSingleCodePointString(codePoint));
+            } else if (settingsValues.mAutoCorrectionEnabledPerUserSettings
                     && Suggest.shouldCodePointAutocorrect(codePoint)) {
                 final String separator = shouldAvoidSendingCode ? LastComposedWord.NOT_A_SEPARATOR
                         : StringUtils.newSingleCodePointString(codePoint);
@@ -1547,18 +1560,21 @@ public final class InputLogic {
             }
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
-            // A normal Backspace on a formatter-adjusted committed word should edit
-            // the text in place, not trigger a special whole-word case undo.
-            if (mLastComposedWord.isHaamidFormattingApplied()) {
-                mHaamidSkipNextAutomaticFormatting = true;
-                mHaamidWordRestoredByUndo = null;
-            }
+            // Determine whether this was a real spelling correction before deciding whether
+            // to suppress the formatter. Undoing a spelling correction must allow Title Case
+            // to run again when the restored original word is committed with Space.
             final boolean isLexicalAutoCorrection =
                     mLastComposedWord.isAutoCorrectionChangedTypedWord()
                     || (mLastComposedWord.mTypedWord != null
                     && mLastComposedWord.mCommittedWord != null
                     && !mLastComposedWord.mTypedWord.equalsIgnoreCase(
                             mLastComposedWord.mCommittedWord.toString()));
+            if (mLastComposedWord.isHaamidFormattingApplied()
+                    && !isLexicalAutoCorrection) {
+                // A formatter-only commit still uses the existing one-character undo path.
+                mHaamidSkipNextAutomaticFormatting = true;
+                mHaamidWordRestoredByUndo = null;
+            }
             if (mLastComposedWord.canRevertCommit()
                     && !mLastComposedWord.isManualSuggestionPick()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
@@ -1567,10 +1583,32 @@ public final class InputLogic {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
                 final boolean wasHaamidFormattingApplied =
                         mLastComposedWord.isHaamidFormattingApplied();
+                final boolean shouldRecomposeForTitleCaseUndo =
+                        wasHaamidFormattingApplied && isLexicalAutoCorrection
+                        && Constants.STRING_SPACE.equals(mLastComposedWord.mSeparatorString)
+                        && inputTransaction.mSettingsValues.mSpacingAndPunctuations
+                                .currentLanguageHasSpaces
+                        && !TextUtils.isEmpty(lastComposedWord);
                 revertCommit(inputTransaction, inputTransaction.mSettingsValues);
                 if (wasHaamidFormattingApplied) {
                     mHaamidWordRestoredByUndo = lastComposedWord != null
                             ? lastComposedWord.toString() : "";
+                }
+                if (shouldRecomposeForTitleCaseUndo) {
+                    // revertCommit correctly restores the exact original typed spelling.
+                    // Put that same text back into composition so the next Space can run
+                    // the normal Title Case commit path without reapplying autocorrection.
+                    final int[] originalCodePoints =
+                            StringUtils.toCodePointArray(lastComposedWord.toString());
+                    mConnection.beginBatchEdit();
+                    mConnection.deleteTextBeforeCursor(lastComposedWord.length());
+                    mWordComposer.setComposingWord(originalCodePoints,
+                            mImeHelper.getCodepointCoordinates(originalCodePoints));
+                    setComposingTextInternal(getTextWithUnderline(lastComposedWord.toString()), 1);
+                    mConnection.endBatchEdit();
+                    // The restored word is now being composed, not sitting before a phantom
+                    // separator. A following character may extend it; Space will commit it.
+                    mSpaceState = SpaceState.NONE;
                 }
                 StatsUtils.onRevertAutoCorrect(mImeHelper.getContext(), lastComposedWord);
                 StatsUtils.onWordCommitUserTyped(lastComposedWord, mWordComposer.isBatchMode());
